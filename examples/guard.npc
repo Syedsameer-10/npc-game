@@ -1,0 +1,17 @@
+NPC Guard {
+
+    WHEN WALL_AHEAD:
+        TURN_LEFT
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    WHEN PLAYER_SEEN:
+        CHASE
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}

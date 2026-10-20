@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NPC Behavior Compiler &amp; Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+:root {
+  /* Ultra-minimal 2-3 color palette: Obsidian + Electric Indigo + Emerald status */
+  --bg:          #08090d;
+  --surface:     #0f1118;
+  --surface-2:   #151822;
+  --surface-3:   #1d2130;
+  --border:      rgba(255, 255, 255, 0.07);
+  --border-md:   rgba(255, 255, 255, 0.12);
+  --border-focus:rgba(99, 102, 241, 0.4);
+  
+  --text-1:      #f4f4f6;
+  --text-2:      #9ca3af;
+  --text-3:      #525866;
+  
+  --accent:      #6366f1;       /* Indigo */
+  --accent-soft: rgba(99, 102, 241, 0.12);
+  --accent-text: #818cf8;
+  
+  --success:     #10b981;       /* Emerald */
+  --success-soft:rgba(16, 185, 129, 0.12);
+  
+  --alert:       #f59e0b;       /* Amber alert */
+  --alert-soft:  rgba(245, 158, 11, 0.12);
+  
+  --danger:      #ef4444;       /* Red danger */
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  
+  --radius-sm:   6px;
+  --radius:      10px;
+  --radius-lg:   16px;
+  --radius-xl:   22px;
+  
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+  --font-sans:   'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono:   'Geist Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: 13.5px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--accent-soft); color: var(--accent-text); }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 99px; }
+
+/* ─── TOPNAV ────────────────────────────────────────── */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(8, 9, 13, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-logo {
+  width: 26px;
+  height: 26px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.nav-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+.nav-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 5px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s var(--ease);
+}
+.nav-btn:hover {
+  color: var(--text-1);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.btn-compile-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.btn-compile-cta:hover {
+  background: #4f46e5;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
+}
+
+/* ─── WORKBENCH CONTAINER ───────────────────────────── */
+.app-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* ─── SECTION HEADER ────────────────────────────────── */
+.section-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+.section-sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* ─── 1. CODE EDITOR & LANGUAGE SIDEBAR ─────────────── */
+.editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 860px) {
+  .editor-grid { grid-template-columns: 1fr; }
+}
+
+.editor-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.editor-top {
+  padding: 10px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.window-dots {
+  display: flex;
+  gap: 5px;
+}
+.window-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+.tab-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-2);
+  margin-left: 6px;
+}
+.editor-stats {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.editor-inner {
+  display: flex;
+  min-height: 280px;
+  position: relative;
+}
+.editor-gutter {
+  width: 42px;
+  padding: 14px 8px 14px 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--text-3);
+  user-select: none;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.editor-code {
+  flex: 1;
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 22px;
+  padding: 14px 16px;
+  border: none;
+  outline: none;
+  resize: none;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.editor-bottom {
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.editor-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* Sidebar */
+.ref-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ref-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+}
+.ref-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ref-group-lbl {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ref-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ref-tag:hover {
+  color: var(--accent-text);
+  border-color: var(--border-focus);
+  background: var(--accent-soft);
+}
+.ref-tag.keyword { color: #a78bfa; border-color: rgba(167, 139, 250, 0.2); }
+.ref-tag.cond    { color: #38bdf8; border-color: rgba(56, 189, 248, 0.2); }
+.ref-tag.act     { color: #34d399; border-color: rgba(52, 211, 153, 0.2); }
+
+/* ─── 2. REFINED PIPELINE DECK (COMPACT TABS & RESULTS) ── */
+.pipeline-deck {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Horizontal Pipeline Stepper Rail */
+.pipeline-rail {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+@media (max-width: 768px) {
+  .pipeline-rail { grid-template-columns: repeat(3, 1fr); }
+}
+
+.step-tab {
+  padding: 12px 14px;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s var(--ease);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.step-tab:last-child { border-right: none; }
+.step-tab:hover {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-1);
+}
+.step-tab.active {
+  background: var(--surface);
+  border-bottom-color: var(--accent);
+  color: var(--text-1);
+}
+.step-idx {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.05em;
+}
+.step-tab.active .step-idx { color: var(--accent-text); }
+.step-name {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.step-badge {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.step-tab.success .step-badge { color: var(--success); }
+.step-tab.error .step-badge   { color: var(--danger); }
+
+/* Pipeline Stage Inspector Pane */
+.pipeline-body {
+  padding: 24px;
+  min-height: 320px;
+  position: relative;
+}
+.stage-content {
+  display: none;
+  animation: fadeIn 0.25s var(--ease) forwards;
+}
+.stage-content.active {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+@media (max-width: 820px) {
+  .stage-content.active { grid-template-columns: 1fr; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stage-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stage-summary h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.stage-summary p {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.stage-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.metric-lbl { color: var(--text-3); }
+.metric-val { color: var(--text-1); font-weight: 500; }
+
+.stage-viewer {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: 340px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+/* Tables & AST styling */
+.clean-tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+.clean-tbl th {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.clean-tbl td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.clean-tbl tr:last-child td { border-bottom: none; }
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+.badge-kw   { background: rgba(167, 139, 250, 0.12); color: #a78bfa; }
+.badge-cond { background: rgba(56, 189, 248, 0.12);  color: #38bdf8; }
+.badge-act  { background: rgba(52, 211, 153, 0.12);  color: #34d399; }
+.badge-id   { background: rgba(255, 255, 255, 0.05); color: var(--text-2); }
+
+.tree-node {
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.1);
+}
+.tree-k { color: #818cf8; font-weight: 500; }
+.tree-v { color: #34d399; }
+.tree-muted { color: var(--text-3); font-size: 10px; }
+
+.ir-line {
+  display: flex;
+  gap: 12px;
+  padding: 3px 0;
+}
+.ir-num { color: var(--text-3); width: 20px; flex-shrink: 0; }
+.ir-code { color: var(--text-1); }
+.ir-kw { color: #a78bfa; font-weight: 600; }
+.ir-cond { color: #38bdf8; }
+.ir-act { color: #34d399; }
+
+/* ─── 3. SIMULATION & DUAL CONTROL ──────────────────── */
+.sim-container {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .sim-container { grid-template-columns: 1fr; }
+}
+
+.sim-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.panel-head {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Canvas viewport */
+.viewport-panel {
+  background: #06070a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.viewport-topbar {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+.canvas-holder {
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+#gameCanvas {
+  border-radius: 6px;
+  image-rendering: pixelated;
+  background: #090a0e;
+}
+
+/* Controls */
+.mode-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--surface-2);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.mode-btn {
+  padding: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: transparent;
+  color: var(--text-2);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.sim-btn-row {
+  display: flex;
+  gap: 6px;
+}
+.btn-sim {
+  flex: 1;
+  padding: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-sim:hover { background: var(--surface-3); }
+.btn-sim.primary {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: var(--accent-text);
+}
+
+.key-guide-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+}
+.key-cap {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  text-align: center;
+}
+.key-desc {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+
+/* Telemetry & Alert */
+.alert-card {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--alert-soft);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--alert);
+  animation: pulseAlert 1.5s infinite;
+}
+@keyframes pulseAlert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.telem-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+.telem-k {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.telem-v {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.rule-highlight-box {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rule-highlight-lbl {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.rule-highlight-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.sensor-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sensor-pill {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  transition: all 0.2s;
+}
+.sensor-pill.active {
+  background: var(--success-soft);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--success);
+  font-weight: 500;
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="topnav">
+  <div class="nav-brand">
+    <div class="nav-logo">λ</div>
+    <span class="nav-title">NPC Behavior Compiler</span>
+    <span class="nav-tag">DSL Workbench</span>
+  </div>
+
+  <div class="nav-links">
+    <a href="#editor-section" class="nav-btn">Editor</a>
+    <a href="#pipeline-section" class="nav-btn">Pipeline</a>
+    <a href="#sim-section" class="nav-btn">Simulation</a>
+    <button class="btn-compile-cta" id="topCompileBtn">
+      <span>▶</span> Compile &amp; Run
+    </button>
+  </div>
+</nav>
+
+<main class="app-container">
+
+  <!-- 1. CODE EDITOR & LANGUAGE REFERENCE -->
+  <section id="editor-section" style="display:flex;flex-direction:column;gap:14px;">
+    <div class="section-meta">
+      <span class="section-tag">01 Behavior Specification</span>
+      <h2 class="section-title">NPC Guard Rule Definition</h2>
+      <p class="section-sub">Define high-level conditional rules in the domain-specific language. The compiler parses and transforms them into an executable behavior matrix.</p>
+    </div>
+
+    <div class="editor-grid">
+      <!-- Editor Box -->
+      <div class="editor-box">
+        <div class="editor-top">
+          <div class="editor-tabs">
+            <div class="window-dots">
+              <div class="window-dot"></div>
+              <div class="window-dot"></div>
+              <div class="window-dot"></div>
+            </div>
+            <span class="tab-name">guard.npc</span>
+          </div>
+          <span class="editor-stats" id="editorLineCount">17 lines</span>
+        </div>
+
+        <div class="editor-inner">
+          <div class="editor-gutter" id="editorGutter">1</div>
+          <textarea class="editor-code" id="sourceEditor" spellcheck="false"></textarea>
+        </div>
+
+        <div class="editor-bottom">
+          <span class="editor-hint">Press ⌘ / Ctrl + Enter to compile</span>
+          <button class="btn-compile-cta" id="mainCompileBtn">
+            <span>⚡</span> Compile Behavior
+          </button>
+        </div>
+      </div>
+
+      <!-- Language Reference Sidebar -->
+      <div class="ref-box">
+        <div class="ref-title">Language Keywords</div>
+        
+        <div class="ref-group">
+          <span class="ref-group-lbl">Block Tokens</span>
+          <div class="tag-list">
+            <span class="ref-tag keyword">NPC</span>
+            <span class="ref-tag keyword">WHEN</span>
+          </div>
+        </div>
+
+        <div class="ref-group">
+          <span class="ref-group-lbl">Sensory Conditions</span>
+          <div class="tag-list">
+            <span class="ref-tag cond">PLAYER_SEEN</span>
+            <span class="ref-tag cond">PLAYER_NEAR</span>
+            <span class="ref-tag cond">ENEMY_NEAR</span>
+            <span class="ref-tag cond">WALL_AHEAD</span>
+            <span class="ref-tag cond">PIT_AHEAD</span>
+            <span class="ref-tag cond">PATH_CLEAR</span>
+            <span class="ref-tag cond">TREASURE_NEAR</span>
+            <span class="ref-tag cond">HEALTH_LOW</span>
+          </div>
+        </div>
+
+        <div class="ref-group">
+          <span class="ref-group-lbl">Available Actions</span>
+          <div class="tag-list">
+            <span class="ref-tag act">CHASE</span>
+            <span class="ref-tag act">ATTACK</span>
+            <span class="ref-tag act">MOVE_FORWARD</span>
+            <span class="ref-tag act">TURN_LEFT</span>
+            <span class="ref-tag act">TURN_RIGHT</span>
+            <span class="ref-tag act">JUMP</span>
+            <span class="ref-tag act">RUN_AWAY</span>
+            <span class="ref-tag act">COLLECT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. REFINED PIPELINE DECK (COMPACT STAGES & INTERMEDIATES) -->
+  <section id="pipeline-section" style="display:flex;flex-direction:column;gap:14px;">
+    <div class="section-meta">
+      <span class="section-tag">02 Transformation Pipeline</span>
+      <h2 class="section-title">Compiler Stage Inspector</h2>
+      <p class="section-sub">Click any compilation pass to inspect its intermediate representation and formal validation metrics.</p>
+    </div>
+
+    <div class="pipeline-deck">
+      <!-- 6 Horizontal Stage Tabs -->
+      <div class="pipeline-rail" id="pipelineRail">
+        <button class="step-tab active" data-stage="1">
+          <span class="step-idx">PASS 01</span>
+          <span class="step-name">Lexical</span>
+          <span class="step-badge" id="badge-lex">Ready</span>
+        </button>
+        <button class="step-tab" data-stage="2">
+          <span class="step-idx">PASS 02</span>
+          <span class="step-name">Syntax</span>
+          <span class="step-badge" id="badge-syn">Ready</span>
+        </button>
+        <button class="step-tab" data-stage="3">
+          <span class="step-idx">PASS 03</span>
+          <span class="step-name">AST Tree</span>
+          <span class="step-badge" id="badge-ast">Ready</span>
+        </button>
+        <button class="step-tab" data-stage="4">
+          <span class="step-idx">PASS 04</span>
+          <span class="step-name">Semantic</span>
+          <span class="step-badge" id="badge-sem">Ready</span>
+        </button>
+        <button class="step-tab" data-stage="5">
+          <span class="step-idx">PASS 05</span>
+          <span class="step-name">IR 3AC</span>
+          <span class="step-badge" id="badge-ir">Ready</span>
+        </button>
+        <button class="step-tab" data-stage="6">
+          <span class="step-idx">PASS 06</span>
+          <span class="step-name">Behavior</span>
+          <span class="step-badge" id="badge-beh">Ready</span>
+        </button>
+      </div>
+
+      <!-- Pipeline Stage Body -->
+      <div class="pipeline-body">
+        
+        <!-- Stage 1: Lexical -->
+        <div class="stage-content active" id="stage-1">
+          <div class="stage-summary">
+            <h4>Lexical Analysis</h4>
+            <p>Scans raw characters and tokenizes them into discrete atomic grammar symbols with source line and column coordinates.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">Total Tokens:</span><span class="metric-val" id="metric-tok-count">—</span></div>
+              <div class="metric-row"><span class="metric-lbl">Grammar Dialect:</span><span class="metric-val">LL(1) Deterministic</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-lex">Compile to view token stream.</div>
+        </div>
+
+        <!-- Stage 2: Syntax -->
+        <div class="stage-content" id="stage-2">
+          <div class="stage-summary">
+            <h4>Syntax Parsing</h4>
+            <p>Recursive-descent LL(1) verification. Checks grammar structure, block delimiters, and keyword sequencing.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">Parse Status:</span><span class="metric-val" id="metric-syn-status">—</span></div>
+              <div class="metric-row"><span class="metric-lbl">Grammar Errors:</span><span class="metric-val" id="metric-syn-err">0</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-syn">Compile to view parse validation.</div>
+        </div>
+
+        <!-- Stage 3: AST -->
+        <div class="stage-content" id="stage-3">
+          <div class="stage-summary">
+            <h4>Abstract Syntax Tree</h4>
+            <p>Hierarchical tree abstraction representing the NPC declaration and ordered behavioral production rules.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">AST Nodes:</span><span class="metric-val" id="metric-ast-nodes">—</span></div>
+              <div class="metric-row"><span class="metric-lbl">Root Entity:</span><span class="metric-val" id="metric-ast-name">Guard</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-ast">Compile to view AST tree.</div>
+        </div>
+
+        <!-- Stage 4: Semantic -->
+        <div class="stage-content" id="stage-4">
+          <div class="stage-summary">
+            <h4>Semantic Analysis</h4>
+            <p>Enforces type safety and sensory compatibility matrix. Catches illegal sensory-action pairs and duplicate conditions.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">Compatibility:</span><span class="metric-val" id="metric-sem-comp">Checked</span></div>
+              <div class="metric-row"><span class="metric-lbl">Warnings:</span><span class="metric-val" id="metric-sem-warn">0</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-sem">Compile to view semantic checks.</div>
+        </div>
+
+        <!-- Stage 5: IR -->
+        <div class="stage-content" id="stage-5">
+          <div class="stage-summary">
+            <h4>Intermediate Representation</h4>
+            <p>Linear three-address code (3AC) instructions. Emits priority-ordered conditional branches for bytecode execution.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">IR Instructions:</span><span class="metric-val" id="metric-ir-count">—</span></div>
+              <div class="metric-row"><span class="metric-lbl">Instruction Set:</span><span class="metric-val">BRANCH_IF</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-ir">Compile to view IR code.</div>
+        </div>
+
+        <!-- Stage 6: Behavior -->
+        <div class="stage-content" id="stage-6">
+          <div class="stage-summary">
+            <h4>Behavior Matrix</h4>
+            <p>The final executable dispatch table linked directly to the live game engine cycle evaluator.</p>
+            <div class="stage-metrics">
+              <div class="metric-row"><span class="metric-lbl">Active Rules:</span><span class="metric-val" id="metric-beh-rules">—</span></div>
+              <div class="metric-row"><span class="metric-lbl">Eval Strategy:</span><span class="metric-val">FIRST_MATCH</span></div>
+            </div>
+          </div>
+          <div class="stage-viewer" id="viewer-beh">Compile to view behavior table.</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. SIMULATION & DUAL CONTROL -->
+  <section id="sim-section" style="display:flex;flex-direction:column;gap:14px;">
+    <div class="section-meta">
+      <span class="section-tag">03 Live Simulation &amp; Operator</span>
+      <h2 class="section-title">Guard Tactical Arena</h2>
+      <p class="section-sub">Test reactive AI behavior. Steer your operator to trigger NPC detection, or take direct manual control with the arrow keys.</p>
+    </div>
+
+    <div class="sim-container">
+      
+      <!-- Left Panel: Mode & Sim Control -->
+      <div class="sim-panel">
+        <div class="panel-head">Simulation Control</div>
+        <div class="panel-body">
+          <div>
+            <div class="telem-k" style="margin-bottom:5px;">NPC Control Mode</div>
+            <div class="mode-toggle-group">
+              <button class="mode-btn active" id="btnModeAuto">⚙ Auto</button>
+              <button class="mode-btn" id="btnModeManual">↑ Manual</button>
+            </div>
+          </div>
+
+          <div class="sim-btn-row">
+            <button class="btn-sim primary" id="simPlayPauseBtn">▶ Run</button>
+            <button class="btn-sim" id="simStepBtn">⏭ Step</button>
+            <button class="btn-sim" id="simResetBtn">↺ Reset</button>
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:10px;">
+            <div class="telem-k" style="margin-bottom:6px;">Controls</div>
+            <div class="key-guide-grid">
+              <span class="key-cap">W A S D</span><span class="key-desc">Move Operator</span>
+              <span class="key-cap">↑ ↓ ← →</span><span class="key-desc">Steer Guard (Manual)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Canvas Viewport -->
+      <div class="viewport-panel">
+        <div class="viewport-topbar">
+          <div class="status-pill">
+            <div class="status-dot"></div>
+            <span id="simCycleText">Cycle 0</span>
+          </div>
+          <span id="simModeBadge" style="font-family:var(--font-mono);font-size:10px;color:var(--accent-text);">
+            ⚙ AUTO (Compiled Rules)
+          </span>
+        </div>
+        <div class="canvas-holder">
+          <canvas id="gameCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Right Panel: Telemetry & Operator Reactivity -->
+      <div class="sim-panel">
+        <div class="panel-head">Live Telemetry</div>
+        <div class="panel-body">
+          
+          <!-- Reactivity Alert -->
+          <div class="alert-card" id="simAlertCard" style="display:none;">
+            <span>⚠</span>
+            <span>OPERATOR IN SIGHT (CHASE)</span>
+          </div>
+
+          <!-- Telemetry Grid -->
+          <div class="telemetry-grid">
+            <div class="telem-cell">
+              <div class="telem-k">Guard HP</div>
+              <div class="telem-v" id="hudGuardHp" style="color:var(--accent-text);">100</div>
+            </div>
+            <div class="telem-cell">
+              <div class="telem-k">Operator HP</div>
+              <div class="telem-v" id="hudPlayerHp" style="color:var(--success);">100</div>
+            </div>
+            <div class="telem-cell">
+              <div class="telem-k">Heading</div>
+              <div class="telem-v" id="hudHeading">RIGHT</div>
+            </div>
+            <div class="telem-cell">
+              <div class="telem-k">Score</div>
+              <div class="telem-v" id="hudScore">0</div>
+            </div>
+          </div>
+
+          <!-- Active Rule -->
+          <div class="rule-highlight-box">
+            <span class="rule-highlight-lbl">Active Matched Rule</span>
+            <span class="rule-highlight-text" id="hudMatchedRule">no rule matched</span>
+          </div>
+
+          <!-- Sensors -->
+          <div>
+            <div class="telem-k" style="margin-bottom:5px;">Sensory State</div>
+            <div class="sensor-wrap" id="hudSensors"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- SCRIPTS -->
+<script src="game/game.js"></script>
+<script>
+// ═══ COMPILER ENGINE ═══
+const VALID_CONDITIONS = new Set([
+  "WALL_AHEAD","PIT_AHEAD","PATH_CLEAR","ENEMY_NEAR",
+  "PLAYER_SEEN","PLAYER_NEAR","TREASURE_NEAR","HEALTH_LOW","DOOR_AHEAD"
+]);
+const VALID_ACTIONS = new Set([
+  "MOVE_FORWARD","TURN_LEFT","TURN_RIGHT","JUMP",
+  "ATTACK","CHASE","RUN_AWAY","COLLECT","STOP"
+]);
+const COMPAT = {
+  WALL_AHEAD:    new Set(["TURN_LEFT","TURN_RIGHT","STOP"]),
+  PIT_AHEAD:     new Set(["JUMP","TURN_LEFT","TURN_RIGHT","STOP"]),
+  PATH_CLEAR:    new Set(["MOVE_FORWARD","STOP"]),
+  ENEMY_NEAR:    new Set(["ATTACK","RUN_AWAY","CHASE"]),
+  PLAYER_SEEN:   new Set(["CHASE","RUN_AWAY","ATTACK"]),
+  PLAYER_NEAR:   new Set(["ATTACK","RUN_AWAY"]),
+  TREASURE_NEAR: new Set(["COLLECT"]),
+  HEALTH_LOW:    new Set(["RUN_AWAY","STOP"]),
+  DOOR_AHEAD:    new Set(["STOP","TURN_LEFT","TURN_RIGHT"]),
+};
+
+// Single clean Guard preset demonstrating operator reactivity
+const GUARD_PRESET = `NPC Guard {
+
+    WHEN WALL_AHEAD:
+        TURN_LEFT
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN PLAYER_NEAR:
+        ATTACK
+
+    WHEN PLAYER_SEEN:
+        CHASE
+
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}`;
+
+function tokenize(src) {
+  const tokens = []; let pos = 0, line = 1, col = 1; const len = src.length;
+  while (pos < len) {
+    const ch = src[pos];
+    if (' \t\r'.includes(ch)) { pos++; col++; continue; }
+    if (ch === '\n') { pos++; line++; col = 1; continue; }
+    if (ch === '#' || (ch === '/' && src[pos+1] === '/')) {
+      while (pos < len && src[pos] !== '\n') pos++;
+      continue;
+    }
+    const sl = line, sc = col;
+    if ('{}:'.includes(ch)) {
+      tokens.push({ type: ch==='{'?'LBRACE':ch==='}'?'RBRACE':'COLON', value: ch, line: sl, column: sc });
+      pos++; col++; continue;
+    }
+    if (/[a-zA-Z_]/.test(ch)) {
+      let id = '';
+      while (pos < len && /[a-zA-Z0-9_]/.test(src[pos])) { id += src[pos]; pos++; col++; }
+      const t = (id==='NPC'||id==='WHEN') ? id : VALID_CONDITIONS.has(id)?'CONDITION':VALID_ACTIONS.has(id)?'ACTION':'IDENTIFIER';
+      tokens.push({ type: t, value: id, line: sl, column: sc });
+      continue;
+    }
+    const e = new Error(`Unexpected character '${ch}'`);
+    e.line = line; e.column = col; throw e;
+  }
+  tokens.push({ type: 'EOF', value: '<EOF>', line, column: col });
+  return tokens;
+}
+
+function parse(tokens) {
+  let pos = 0;
+  const cur = () => tokens[pos] || tokens[tokens.length - 1];
+  const match = t => {
+    const tok = cur();
+    if (tok.type === t) { pos++; return tok; }
+    const e = new Error(`Expected '${t}', got '${tok.value}'`);
+    e.line = tok.line; e.column = tok.column; throw e;
+  };
+
+  match('NPC');
+  const nm = match('IDENTIFIER');
+  match('LBRACE');
+  const rules = [];
+  while (cur().type !== 'RBRACE') {
+    if (cur().type === 'EOF') {
+      const e = new Error(`Unclosed block: missing '}' for '${nm.value}'`);
+      e.line = cur().line; e.column = cur().column; throw e;
+    }
+    const w = match('WHEN');
+    const ct = cur();
+    if (ct.type !== 'CONDITION') {
+      const e = new Error(`Expected condition, got '${ct.value}'`);
+      e.line = ct.line; e.column = ct.column; throw e;
+    }
+    pos++;
+    const cc = cur();
+    if (cc.type !== 'COLON') {
+      const e = new Error(`Expected ':', got '${cc.value}'`);
+      e.line = cc.line; e.column = cc.column; throw e;
+    }
+    pos++;
+    const at = cur();
+    if (at.type !== 'ACTION') {
+      const e = new Error(`Expected action, got '${at.value}'`);
+      e.line = at.line; e.column = at.column; throw e;
+    }
+    pos++;
+    rules.push({
+      type: 'Rule',
+      condition: { type: 'Condition', name: ct.value, line: ct.line, column: ct.column },
+      action: { type: 'Action', name: at.value, line: at.line, column: at.column },
+      line: w.line, column: w.column
+    });
+  }
+  match('RBRACE');
+  return { type: 'Program', npc: { type: 'NPCDeclaration', name: nm.value, rules, line: nm.line, column: nm.column } };
+}
+
+function semantic(ast) {
+  const errors = [], warnings = [], seen = new Set();
+  for (const r of ast.npc.rules) {
+    const c = r.condition.name, a = r.action.name;
+    if (seen.has(c)) {
+      warnings.push({ phase: 'Semantic Analysis', message: `Duplicate condition '${c}'. First rule takes precedence.`, line: r.line });
+    } else {
+      seen.add(c);
+    }
+    const allowed = COMPAT[c];
+    if (allowed && !allowed.has(a)) {
+      errors.push({ phase: 'Semantic Analysis', message: `'${a}' is not valid for condition '${c}'.`, line: r.action.line });
+    } else if (!allowed) {
+      errors.push({ phase: 'Semantic Analysis', message: `Unknown condition '${c}'.`, line: r.condition.line });
+    }
+  }
+  return { errors, warnings };
+}
+
+function generateIR(ast) {
+  const instructions = [], irCode = [];
+  let p = 1;
+  for (const r of ast.npc.rules) {
+    const s = `IF ${r.condition.name} THEN ${r.action.name}`;
+    irCode.push(s);
+    instructions.push({ op: 'BRANCH_IF', condition: r.condition.name, action: r.action.name, priority: p++, line: r.line, instruction: s });
+  }
+  return { npc: ast.npc.name, instructions, ir_code: irCode };
+}
+
+function generateBehavior(ir) {
+  const rules = [], seen = new Set();
+  for (const i of ir.instructions) {
+    const isActive = !seen.has(i.condition);
+    seen.add(i.condition);
+    rules.push({ id: `rule_${i.priority}`, condition: i.condition, action: i.action, priority: i.priority, isActive, sourceLine: i.line });
+  }
+  return { npc: ir.npc, ruleCount: rules.length, rules, evaluationMode: 'FIRST_MATCH_PRIORITY' };
+}
+
+function compile(source) {
+  const phases = [], errors = [], warnings = [];
+  let tokens, ast, sem, ir, behavior;
+  try {
+    tokens = tokenize(source); phases.push('Lexical');
+  } catch(e) {
+    errors.push({ phase: 'Lexical Analysis', line: e.line||1, message: e.message });
+    return { success: false, errors, warnings, phasesCompleted: phases };
+  }
+  try {
+    ast = parse(tokens); phases.push('Syntax'); phases.push('AST');
+  } catch(e) {
+    errors.push({ phase: 'Syntax Analysis', line: e.line||1, message: e.message });
+    return { success: false, tokens, errors, warnings, phasesCompleted: phases };
+  }
+  sem = semantic(ast);
+  warnings.push(...sem.warnings);
+  if (sem.errors.length) {
+    errors.push(...sem.errors);
+    return { success: false, tokens, ast, errors, warnings, phasesCompleted: phases };
+  }
+  phases.push('Semantic');
+  ir = generateIR(ast); phases.push('IR');
+  behavior = generateBehavior(ir); phases.push('Behavior');
+  return { success: true, tokens, ast, semantic: sem, ir, behavior, errors, warnings, phasesCompleted: phases };
+}
+
+// ═══ UI & PIPELINE DECK LOGIC ═══
+const E = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// Pipeline tab switching
+document.querySelectorAll('.step-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.stage-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    const stageId = tab.dataset.stage;
+    const target = E(`stage-${stageId}`);
+    if (target) target.classList.add('active');
+  });
+});
+
+function updatePipelineUI(res) {
+  // Update Badges
+  E('badge-lex').textContent = res.tokens ? `${res.tokens.length - 1} toks` : 'Error';
+  E('badge-lex').parentElement.className = `step-tab ${res.tokens ? 'success' : 'error'}`;
+
+  E('badge-syn').textContent = res.ast ? 'Valid' : (res.errors?.some(e => e.phase.includes('Syntax')) ? 'Error' : '—');
+  E('badge-syn').parentElement.className = `step-tab ${res.ast ? 'success' : 'error'}`;
+
+  E('badge-ast').textContent = res.ast ? `${res.ast.npc.rules.length} rules` : '—';
+  E('badge-ast').parentElement.className = `step-tab ${res.ast ? 'success' : ''}`;
+
+  E('badge-sem').textContent = res.semantic?.errors?.length ? `${res.semantic.errors.length} err` : 'Pass';
+  E('badge-sem').parentElement.className = `step-tab ${res.semantic?.errors?.length ? 'error' : 'success'}`;
+
+  E('badge-ir').textContent = res.ir ? `${res.ir.instructions.length} ins` : '—';
+  E('badge-ir').parentElement.className = `step-tab ${res.ir ? 'success' : ''}`;
+
+  E('badge-beh').textContent = res.behavior ? `${res.behavior.ruleCount} ready` : '—';
+  E('badge-beh').parentElement.className = `step-tab ${res.behavior ? 'success' : ''}`;
+
+  // Stage 1: Tokens viewer
+  if (res.tokens) {
+    E('metric-tok-count').textContent = res.tokens.length - 1;
+    const rows = res.tokens.filter(t => t.type !== 'EOF').map((t, i) => {
+      const cls = t.type==='NPC'||t.type==='WHEN' ? 'badge-kw' : t.type==='CONDITION' ? 'badge-cond' : t.type==='ACTION' ? 'badge-act' : 'badge-id';
+      return `<tr><td style="color:var(--text-3)">${i+1}</td><td><span class="badge ${cls}">${t.type}</span></td><td>${esc(t.value)}</td><td style="color:var(--text-3)">${t.line}:${t.column}</td></tr>`;
+    }).join('');
+    E('viewer-lex').innerHTML = `<table class="clean-tbl"><thead><tr><th>#</th><th>Type</th><th>Value</th><th>Loc</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  // Stage 2: Syntax viewer
+  if (res.ast) {
+    E('metric-syn-status').textContent = 'Accepted';
+    E('viewer-syn').innerHTML = `<div style="color:var(--success);padding:4px 0;">✓ LL(1) grammar successfully verified structure.</div><div style="color:var(--text-2);margin-top:8px;">Root node: NPC '${esc(res.ast.npc.name)}' with ${res.ast.npc.rules.length} rule productions verified.</div>`;
+  } else if (res.errors?.length) {
+    E('metric-syn-status').textContent = 'Syntax Error';
+    E('viewer-syn').innerHTML = `<div style="color:var(--danger)">✕ ${esc(res.errors[0].message)} (Line ${res.errors[0].line})</div>`;
+  }
+
+  // Stage 3: AST viewer
+  if (res.ast) {
+    E('metric-ast-nodes').textContent = res.ast.npc.rules.length + 2;
+    E('metric-ast-name').textContent = res.ast.npc.name;
+    let h = `<div><span class="tree-k">Program</span><div class="tree-node"><span class="tree-k">NPCDeclaration</span> <span class="tree-v">"${esc(res.ast.npc.name)}"</span>`;
+    res.ast.npc.rules.forEach((r, i) => {
+      h += `<div class="tree-node"><span class="tree-k">Rule #${i+1}</span> <span class="tree-muted">ln ${r.line}</span><div class="tree-node"><span class="tree-k">when:</span> <span class="tree-v">${esc(r.condition.name)}</span></div><div class="tree-node"><span class="tree-k">then:</span> <span class="tree-v" style="color:#a78bfa">${esc(r.action.name)}</span></div></div>`;
+    });
+    h += `</div></div>`;
+    E('viewer-ast').innerHTML = h;
+  }
+
+  // Stage 4: Semantic viewer
+  if (res.semantic) {
+    let out = '';
+    if (res.semantic.warnings.length) {
+      out += res.semantic.warnings.map(w => `<div style="color:var(--alert);margin-bottom:6px;">⚠ Warning (Line ${w.line}): ${esc(w.message)}</div>`).join('');
+    }
+    if (res.semantic.errors?.length) {
+      out += res.semantic.errors.map(e => `<div style="color:var(--danger);margin-bottom:6px;">✕ Error (Line ${e.line}): ${esc(e.message)}</div>`).join('');
+    }
+    if (!out) {
+      out = `<div style="color:var(--success)">✓ All sensory conditions and actions pass compatibility verification.</div>`;
+    }
+    E('viewer-sem').innerHTML = out;
+  }
+
+  // Stage 5: IR viewer
+  if (res.ir) {
+    E('metric-ir-count').textContent = res.ir.instructions.length;
+    E('viewer-ir').innerHTML = res.ir.instructions.map(ins => {
+      return `<div class="ir-line"><span class="ir-num">${String(ins.priority).padStart(2,'0')}</span><span class="ir-code"><span class="ir-kw">IF</span> <span class="ir-cond">${esc(ins.condition)}</span> <span class="ir-kw">THEN</span> <span class="ir-act">${esc(ins.action)}</span></span></div>`;
+    }).join('');
+  }
+
+  // Stage 6: Behavior viewer
+  if (res.behavior) {
+    E('metric-beh-rules').textContent = res.behavior.ruleCount;
+    const rows = res.behavior.rules.map(r => `<tr><td style="color:var(--text-3)">${r.priority}</td><td><span class="badge badge-cond">${esc(r.condition)}</span></td><td><span class="badge badge-act">${esc(r.action)}</span></td><td style="color:${r.isActive?'var(--success)':'var(--alert)'}">${r.isActive?'ACTIVE':'SHADOWED'}</td></tr>`).join('');
+    E('viewer-beh').innerHTML = `<table class="clean-tbl"><thead><tr><th>#</th><th>Sensor Trigger</th><th>Action Executed</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+}
+
+// ═══ GAME SIMULATION SETUP ═══
+const game = new GameEngine('gameCanvas',
+  // onTick telemetry callback
+  tel => {
+    E('simCycleText').textContent = `Cycle ${tel.cycle ?? 0}`;
+    E('hudHeading').textContent   = tel.heading || 'RIGHT';
+    E('hudScore').textContent     = tel.score ?? 0;
+    
+    // Guard HP
+    const gHp = tel.npcHealth ?? 100;
+    E('hudGuardHp').textContent = gHp;
+    E('hudGuardHp').style.color = gHp <= 30 ? 'var(--danger)' : 'var(--accent-text)';
+
+    // Player HP
+    const pHp = tel.playerHealth ?? 100;
+    E('hudPlayerHp').textContent = pHp;
+    E('hudPlayerHp').style.color = pHp <= 30 ? 'var(--danger)' : 'var(--success)';
+
+    // Alert Card (Operator reactive feedback)
+    E('simAlertCard').style.display = tel.alertActive ? 'flex' : 'none';
+
+    // Matched Rule display
+    if (tel.matchedRule) {
+      E('hudMatchedRule').textContent = `#${tel.matchedRule.priority} ${tel.matchedRule.condition} → ${tel.matchedRule.action}`;
+      E('hudMatchedRule').style.color = 'var(--accent-text)';
+    } else {
+      E('hudMatchedRule').textContent = tel.npcMode === 'manual' ? 'Manual control active' : 'no rule matched';
+      E('hudMatchedRule').style.color = 'var(--text-3)';
+    }
+
+    // Sensory chips
+    if (tel.conditions) {
+      E('hudSensors').innerHTML = Object.entries(tel.conditions).map(([k, v]) => {
+        return `<span class="sensor-pill ${v ? 'active' : ''}">${k}</span>`;
+      }).join('');
+    }
+  },
+  // onStateChange
+  running => {
+    const b = E('simPlayPauseBtn');
+    b.textContent = running ? '⏸ Pause' : '▶ Run';
+  }
+);
+
+// Init sensors chips
+E('hudSensors').innerHTML = Object.keys(COMPAT).map(k => `<span class="sensor-pill">${k}</span>`).join('');
+
+// Mode toggles
+E('btnModeAuto').addEventListener('click', () => {
+  game.setNPCMode('auto');
+  E('btnModeAuto').classList.add('active');
+  E('btnModeManual').classList.remove('active');
+  E('simModeBadge').textContent = '⚙ AUTO (Compiled Rules)';
+  E('simModeBadge').style.color = 'var(--accent-text)';
+});
+E('btnModeManual').addEventListener('click', () => {
+  game.setNPCMode('manual');
+  E('btnModeManual').classList.add('active');
+  E('btnModeAuto').classList.remove('active');
+  E('simModeBadge').textContent = '↑ MANUAL (Arrow Keys Steer NPC)';
+  E('simModeBadge').style.color = '#a78bfa';
+});
+
+// Sim Controls
+E('simPlayPauseBtn').addEventListener('click', () => {
+  game.running ? game.pause() : game.start();
+});
+E('simStepBtn').addEventListener('click', () => {
+  game.pause();
+  game.step();
+});
+E('simResetBtn').addEventListener('click', () => {
+  game.pause();
+  game.initWorld();
+  game.render();
+});
+
+// Compile Action
+function triggerCompilation() {
+  const code = E('sourceEditor').value.trim();
+  if (!code) return;
+  const res = compile(code);
+  updatePipelineUI(res);
+  if (res.success && res.behavior) {
+    game.setRules(res.behavior);
+    game.start();
+  }
+}
+
+E('mainCompileBtn').addEventListener('click', triggerCompilation);
+E('topCompileBtn').addEventListener('click', triggerCompilation);
+
+// Editor shortcuts & line numbers
+function updateEditorStats() {
+  const lines = E('sourceEditor').value.split('\n');
+  E('editorGutter').textContent = lines.map((_, i) => i + 1).join('\n');
+  E('editorLineCount').textContent = `${lines.length} lines`;
+}
+E('sourceEditor').addEventListener('input', updateEditorStats);
+E('sourceEditor').addEventListener('scroll', () => {
+  E('editorGutter').scrollTop = E('sourceEditor').scrollTop;
+});
+E('sourceEditor').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    triggerCompilation();
+  }
+});
+
+// Initialize with Guard Preset
+E('sourceEditor').value = GUARD_PRESET;
+updateEditorStats();
+triggerCompilation();
+</script>
+</body>
+</html>

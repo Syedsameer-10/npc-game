@@ -1,0 +1,14 @@
+NPC Patrol {
+
+    WHEN WALL_AHEAD:
+        TURN_RIGHT
+
+    WHEN PLAYER_SEEN:
+        CHASE
+
+    WHEN PLAYER_NEAR:
+        ATTACK
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}

@@ -1,0 +1,17 @@
+NPC Collector {
+
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    WHEN ENEMY_NEAR:
+        RUN_AWAY
+
+    WHEN WALL_AHEAD:
+        TURN_RIGHT
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}

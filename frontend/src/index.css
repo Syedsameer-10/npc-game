@@ -1,0 +1,96 @@
+
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/node_modules/geist/dist/fonts/geist-sans/Geist-Medium.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/node_modules/geist/dist/fonts/geist-sans/Geist-Bold.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/node_modules/geist/dist/fonts/geist-mono/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/node_modules/geist/dist/fonts/geist-mono/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/node_modules/geist/dist/fonts/geist-mono/GeistMono-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+
+:root {
+  --bg:           #f7f7f5;
+  --surface:      #ffffff;
+  --surface-2:    #f4f4f2;
+  --surface-3:    #eeeeec;
+  --border:       rgba(0,0,0,0.08);
+  --border-md:    rgba(0,0,0,0.13);
+  --text-1:       #111110;
+  --text-2:       #5c5c5a;
+  --text-3:       #9b9b99;
+  --accent:       #1a56db;
+  --accent-soft:  rgba(26,86,219,0.09);
+  --success:      #16a34a;
+  --success-soft: rgba(22,163,74,0.09);
+  --warn:         #ca8a04;
+  --warn-soft:    rgba(202,138,4,0.09);
+  --danger:       #dc2626;
+  --danger-soft:  rgba(220,38,38,0.09);
+  --kw-npc:       #7c3aed;
+  --kw-cond:      #0369a1;
+  --kw-act:       #c2410c;
+  --ease: cubic-bezier(0.32,0.72,0,1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'GeistSans', 'Geist', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent-soft); color: var(--accent); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 99px; }
+
+/* Monospace font utility */
+.font-mono {
+  font-family: 'GeistMono', 'Geist Mono', 'Fira Code', monospace;
+}
+
+/* Offset for sticky nav in scroll navigation */
+.phase-section, #game-section, #editor-section {
+  scroll-margin-top: 72px;
+}
+
+.phase-pill-active {
+  box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
