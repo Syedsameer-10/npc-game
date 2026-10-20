@@ -5,12 +5,12 @@ const MANUAL_ACTIONS = [
   { key: 'MOVE_FORWARD', label: 'Forward', kbd: 'I', color: '#3b82f6' },
   { key: 'TURN_LEFT',    label: 'Turn Left', kbd: 'J', color: '#64748b' },
   { key: 'TURN_RIGHT',   label: 'Turn Right', kbd: 'L', color: '#64748b' },
-  { key: 'JUMP',         label: 'Jump', kbd: 'P', color: '#38bdf8' },
-  { key: 'ATTACK',       label: 'Attack', kbd: 'U', color: '#f87171' },
-  { key: 'CHASE',        label: 'Chase', kbd: '', color: '#fb923c' },
-  { key: 'RUN_AWAY',     label: 'Run Away', kbd: '', color: '#a78bfa' },
-  { key: 'COLLECT',      label: 'Collect', kbd: 'O', color: '#facc15' },
-  { key: 'STOP',         label: 'Stop / Heal', kbd: 'H', color: '#34d399' },
+  { key: 'JUMP',         label: 'Jump (Pit)', kbd: 'P', color: '#38bdf8' },
+  { key: 'ATTACK',       label: 'Attack Sentry', kbd: 'U', color: '#f87171' },
+  { key: 'CHASE',        label: 'Seek Target', kbd: '', color: '#fb923c' },
+  { key: 'RUN_AWAY',     label: 'Evade Area', kbd: '', color: '#a78bfa' },
+  { key: 'COLLECT',      label: 'Extract Core', kbd: 'O', color: '#facc15' },
+  { key: 'STOP',         label: 'Hold & Shield', kbd: 'H', color: '#34d399' },
 ]
 
 const SPEEDS = [
@@ -62,7 +62,7 @@ export default function GameSection({ gameRef, onEngineReady }) {
   const [telemetry,    setTelemetry]    = useState({
     cycle: 0, action: 'IDLE', heading: 'RIGHT', health: 100,
     operatorHealth: 100, score: 0, matchedRule: null, conditions: {},
-    mission: { name: 'Sector 7: Tactical Grid', objective: 'Intercept threat units', status: 'ACTIVE', collected: 0, totalT: 2, threats: 2 },
+    mission: { name: 'Sector 7: Tactical Combat Ground', objective: 'Destroy all static target sentries', status: 'ACTIVE', collected: 0, totalT: 2, threats: 2 },
   })
 
   const mono   = "'Geist Mono', monospace"
@@ -111,7 +111,9 @@ export default function GameSection({ gameRef, onEngineReady }) {
         {/* ── Section header ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>2D NPC Simulator</div>
+            <div style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+              Interactive NPC Rule Simulator
+            </div>
             <h2 style={{ fontFamily: sans, fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', color: text1, margin: 0 }}>
               {telemetry.mission?.name}
             </h2>
@@ -127,8 +129,8 @@ export default function GameSection({ gameRef, onEngineReady }) {
             </div>
             <div style={{ fontFamily: mono, fontSize: 9, color: text2 }}>
               {telemetry.mission?.status === 'ACTIVE'
-                ? `${telemetry.mission.threats} threats · ${telemetry.mission.collected}/${telemetry.mission.totalT} cores`
-                : telemetry.mission?.status === 'VICTORY' ? 'Mission complete' : 'Unit destroyed'}
+                ? `${telemetry.mission.threats} target sentries · ${telemetry.mission.collected}/${telemetry.mission.totalT} cores`
+                : telemetry.mission?.status === 'VICTORY' ? 'Demo Objective Achieved' : 'Mission ended'}
             </div>
           </div>
         </div>
@@ -181,9 +183,9 @@ export default function GameSection({ gameRef, onEngineReady }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Map</span>
                 <select value={mapId} onChange={e => handleMap(e.target.value)} style={{ fontFamily: mono, fontSize: 10.5, padding: '4px 8px', borderRadius: 4, border: `1px solid ${border}`, background: bg2, color: text1, outline: 'none', cursor: 'pointer' }}>
-                  <option value="arena">Sector 7 — Defense</option>
+                  <option value="arena">Sector 7 — Combat Demo</option>
                   <option value="dungeon">Vault Alpha — Extraction</option>
-                  <option value="maze">Sector 9 — Maze</option>
+                  <option value="maze">Sector 9 — Obstacle Maze</option>
                 </select>
               </div>
             </div>
@@ -240,7 +242,7 @@ export default function GameSection({ gameRef, onEngineReady }) {
               <div style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>NPC Agent ▲</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontFamily: mono, fontSize: 9, color: text2, marginBottom: 2 }}>HEALTH</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: text2, marginBottom: 2 }}>SHIELD</div>
                   <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: text1 }}>{telemetry.health}<span style={{ fontSize: 9, color: text2 }}>%</span></div>
                   <HealthBar value={telemetry.health} color="#22c55e" />
                 </div>
@@ -260,13 +262,12 @@ export default function GameSection({ gameRef, onEngineReady }) {
             <div style={{ background: bg1, border: `1px solid ${border}`, borderRadius: 8, padding: '12px 14px' }}>
               <div style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Operator ◉</div>
               <div style={{ marginBottom: 6 }}>
-                <div style={{ fontFamily: mono, fontSize: 9, color: text2, marginBottom: 2 }}>HEALTH</div>
-                <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: text1 }}>{telemetry.operatorHealth ?? 100}<span style={{ fontSize: 9, color: text2 }}>%</span></div>
-                <HealthBar value={telemetry.operatorHealth ?? 100} color="#34d399" />
+                <div style={{ fontFamily: mono, fontSize: 9, color: text2, marginBottom: 2 }}>STATUS</div>
+                <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: '#34d399' }}>ACTIVE</div>
               </div>
               <div style={{ fontFamily: mono, fontSize: 9, color: text2, lineHeight: 1.7, background: 'rgba(255,255,255,0.03)', borderRadius: 5, padding: '6px 8px', marginTop: 8 }}>
                 <div><span style={{ color: '#34d399' }}>WASD</span> / arrows — move</div>
-                <div><span style={{ color: '#f87171' }}>Space</span> — melee attack</div>
+                <div><span style={{ color: '#f87171' }}>Space</span> — attack adjacent sentry</div>
               </div>
             </div>
 
@@ -283,7 +284,15 @@ export default function GameSection({ gameRef, onEngineReady }) {
             {/* Legend */}
             <div style={{ background: bg1, border: `1px solid ${border}`, borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ fontFamily: mono, fontSize: 9.5, color: text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Map Legend</div>
-              {[['▲','#60a5fa','NPC Agent'],['◉','#34d399','Operator'],['◆','#f87171','Enemy'],['◈','#fbbf24','Data Core'],['■','#475569','Wall'],['✕','#f87171','Hazard Pit'],['⌑','#f59e0b','Exit Gate']].map(([g,c,l]) => (
+              {[
+                ['▲','#60a5fa','NPC Agent (Rule Driven)'],
+                ['◉','#34d399','Operator (Player)'],
+                ['◆','#f87171','Static Sentry / Target'],
+                ['◈','#fbbf24','Data Core (Treasure)'],
+                ['■','#475569','Obstacle Wall'],
+                ['✕','#f87171','Hazard Pit (Jump)'],
+                ['⌑','#f59e0b','Exit Gate']
+              ].map(([g,c,l]) => (
                 <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                   <span style={{ fontFamily: mono, fontSize: 12, color: c, width: 16, textAlign: 'center' }}>{g}</span>
                   <span style={{ fontFamily: sans, fontSize: 10.5, color: text2 }}>{l}</span>

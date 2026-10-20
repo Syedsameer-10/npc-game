@@ -1,14 +1,15 @@
 // GameEngine — Full 2D NPC Simulator
 // NPC behavior is driven entirely by the compiled rule dispatch table
 // Operator is player-controlled (WASD + Space attack)
-// Manual mode: all NPC actions are triggered by UI / keyboard
+// Target Dummies / Sentries are static obstacles that do not move or attack,
+// allowing clean, reproducible rule demos without chaotic death loops.
 
 export const MAPS = {
   arena: {
     id: 'arena',
-    name: 'Sector 7: Tactical Grid',
+    name: 'Sector 7: Tactical Combat Ground',
     missionType: 'DEFENSE',
-    objective: 'Eliminate all threats before they breach HQ',
+    objective: 'Destroy all static target dummies using compiled rules or manual combat',
     w: 18, h: 13,
     grid: [
       "##################",
@@ -30,7 +31,7 @@ export const MAPS = {
     id: 'dungeon',
     name: 'Vault Alpha: Extraction Grid',
     missionType: 'EXTRACTION',
-    objective: 'Collect all data cores and reach the exit gate',
+    objective: 'Collect all data cores, clear target sentries, and enter exit gate',
     w: 18, h: 13,
     grid: [
       "##################",
@@ -50,9 +51,9 @@ export const MAPS = {
   },
   maze: {
     id: 'maze',
-    name: 'Sector 9: Hazard Maze',
+    name: 'Sector 9: Obstacle & Hazard Maze',
     missionType: 'NAVIGATION',
-    objective: 'Navigate the maze, collect data cores, avoid pits',
+    objective: 'Jump hazard pits, turn at walls, and extract all data cores',
     w: 18, h: 13,
     grid: [
       "##################",
@@ -224,7 +225,8 @@ export class GameEngine {
           playerStart = { x: c, y: r };
           this.tiles[r][c] = '.';
         } else if (ch === 'E') {
-          this.enemies.push({ id: `e${this.enemies.length}`, x: c, y: r, alive: true, health: 50, maxHealth: 50, cooldown: 0 });
+          // Static target dummy / sentry: stationary, does not attack, can be destroyed
+          this.enemies.push({ id: `e${this.enemies.length}`, x: c, y: r, alive: true, health: 60, maxHealth: 60, isStatic: true });
           this.tiles[r][c] = '.';
         } else if (ch === 'T') {
           this.treasures.push({ id: `t${this.treasures.length}`, x: c, y: r, collected: false });
@@ -255,6 +257,8 @@ export class GameEngine {
   isDoor(x, y)   { return this.tile(x, y) === 'D'; }
   canEnter(x, y) {
     if (this.isWall(x, y) || this.isPit(x, y)) return false;
+    // Static targets block movement until destroyed
+    if (this.enemies.some(e => e.alive && e.x === x && e.y === y)) return false;
     if (this.isDoor(x, y)) return this.treasures.every(t => t.collected);
     return true;
   }
@@ -310,14 +314,14 @@ export class GameEngine {
     let hit = false;
     for (const e of this.enemies) {
       if (e.alive && Math.hypot(e.x - this.player.x, e.y - this.player.y) <= 1.5) {
-        e.health -= 40;
+        e.health -= 30;
         this.sfx.playAttack();
         this.burst(e.x * TS + TS/2, e.y * TS + TS/2, '#f87171', 8);
-        this.floatText(e.x, e.y, '-40', '#f87171');
+        this.floatText(e.x, e.y, '-30', '#f87171');
         if (e.health <= 0) {
           e.alive = false;
-          this.npc.score += 100;
-          this.floatText(e.x, e.y, '+100 KILL', '#4ade80');
+          this.npc.score += 150;
+          this.floatText(e.x, e.y, '+150 TARGET DESTROYED', '#4ade80');
         }
         hit = true;
         break;
@@ -343,8 +347,8 @@ export class GameEngine {
       WALL_AHEAD:    this.isWall(a1.x, a1.y),
       PIT_AHEAD:     this.isPit(a1.x, a1.y),
       DOOR_AHEAD:    this.isDoor(a1.x, a1.y),
-      PATH_CLEAR:    !this.isWall(a1.x, a1.y) && !this.isPit(a1.x, a1.y) && !this.isDoor(a1.x, a1.y),
-      ENEMY_NEAR:    this.enemies.some(e => e.alive && dist(e.x, e.y) <= 2.5),
+      PATH_CLEAR:    !this.isWall(a1.x, a1.y) && !this.isPit(a1.x, a1.y) && !this.isDoor(a1.x, a1.y) && !this.enemies.some(e => e.alive && e.x === a1.x && e.y === a1.y),
+      ENEMY_NEAR:    this.enemies.some(e => e.alive && dist(e.x, e.y) <= 2.2),
       PLAYER_SEEN:   this._rayCast(this.player.x, this.player.y),
       PLAYER_NEAR:   dist(this.player.x, this.player.y) <= 1.8,
       TREASURE_NEAR: this.treasures.some(t => !t.collected && dist(t.x, t.y) <= 2.5),
@@ -411,10 +415,14 @@ export class GameEngine {
           if (n.trail.length > 8) n.trail.shift();
           this.sfx.playJump();
           this.burst(n.displayX * TS + TS/2, n.displayY * TS + TS/2, '#38bdf8', 10);
-          this.floatText(n.x, n.y, 'JUMP!', '#38bdf8');
+          this.floatText(n.x, n.y, 'JUMPED PIT', '#38bdf8');
         } else {
-          // No pit? fallback to move
-          mv(v.dx, v.dy);
+          // If no pit or cannot land, turn or step
+          if (this.canEnter(this.ahead(1).x, this.ahead(1).y)) {
+            mv(v.dx, v.dy);
+          } else {
+            n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4];
+          }
         }
         break;
       }
@@ -426,33 +434,44 @@ export class GameEngine {
             e.health -= 30;
             this.sfx.playAttack();
             this.burst(e.x * TS + TS/2, e.y * TS + TS/2, '#f87171', 10);
-            this.floatText(e.x, e.y, '-30', '#f87171');
+            this.floatText(e.x, e.y, '-30 HIT', '#f87171');
             if (e.health <= 0) {
               e.alive = false;
               n.score += 250;
-              this.floatText(e.x, e.y, '+250!', '#4ade80');
+              this.floatText(e.x, e.y, '+250 DESTROYED', '#4ade80');
             }
             attacked = true;
             break;
           }
         }
-        // If no enemy in range, step forward (useful behavior)
-        if (!attacked) mv(v.dx, v.dy);
+        // If target not reached yet, advance toward nearest target
+        if (!attacked) {
+          const nearest = this.nearestEnemy(n.x, n.y);
+          if (nearest) {
+            const dx = nearest.x - n.x, dy = nearest.y - n.y;
+            if (Math.abs(dx) >= Math.abs(dy)) { mv(Math.sign(dx), 0); n.dir = dx > 0 ? 'RIGHT' : 'LEFT'; }
+            else { mv(0, Math.sign(dy)); n.dir = dy > 0 ? 'DOWN' : 'UP'; }
+          } else {
+            mv(v.dx, v.dy);
+          }
+        }
         break;
       }
 
       case 'CHASE': {
-        // Chase nearest enemy or player
+        // Chase nearest target or player
         const target = this.nearestEnemy(n.x, n.y) || this.player;
         const dx = target.x - n.x, dy = target.y - n.y;
         if (Math.abs(dx) >= Math.abs(dy)) {
           const s = dx > 0 ? 1 : -1;
           if (this.canEnter(n.x + s, n.y)) { mv(s, 0); n.dir = s > 0 ? 'RIGHT' : 'LEFT'; }
           else if (this.canEnter(n.x, n.y + Math.sign(dy))) { mv(0, Math.sign(dy)); n.dir = dy > 0 ? 'DOWN' : 'UP'; }
+          else { n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4]; }
         } else {
           const s = dy > 0 ? 1 : -1;
           if (this.canEnter(n.x, n.y + s)) { mv(0, s); n.dir = s > 0 ? 'DOWN' : 'UP'; }
           else if (this.canEnter(n.x + Math.sign(dx), n.y)) { mv(Math.sign(dx), 0); n.dir = dx > 0 ? 'RIGHT' : 'LEFT'; }
+          else { n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4]; }
         }
         break;
       }
@@ -470,17 +489,17 @@ export class GameEngine {
       case 'COLLECT': {
         let collected = false;
         for (const t of this.treasures) {
-          if (!t.collected && Math.hypot(t.x - n.x, t.y - n.y) <= 2.0) {
+          if (!t.collected && Math.hypot(t.x - n.x, t.y - n.y) <= 1.8) {
             t.collected = true;
             n.score += 150;
             this.sfx.playCollect();
             this.burst(t.x * TS + TS/2, t.y * TS + TS/2, '#facc15', 14);
-            this.floatText(t.x, t.y, '+150', '#facc15');
+            this.floatText(t.x, t.y, '+150 CORE', '#facc15');
             collected = true;
             break;
           }
         }
-        // If nothing to collect, move towards nearest treasure
+        // If nothing in range, move towards nearest data core
         if (!collected) {
           const nearest = this.treasures.filter(t => !t.collected).sort((a,b) => Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y))[0];
           if (nearest) {
@@ -509,58 +528,20 @@ export class GameEngine {
       .sort((a,b) => Math.hypot(a.x-x,a.y-y) - Math.hypot(b.x-x,b.y-y))[0] || null;
   }
 
-  // ── World advance (enemy AI) ──────────────────────────────────────────
+  // ── World advance ─────────────────────────────────────────────────────
   advanceWorld() {
-    // Enemy AI: advance every 2 cycles, attack on contact
-    if (this.cycle % 2 === 0) {
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-
-        // Target whoever is closer
-        const toNPC    = Math.hypot(e.x - this.npc.x,    e.y - this.npc.y);
-        const toPlayer = Math.hypot(e.x - this.player.x,  e.y - this.player.y);
-        const target   = toNPC < toPlayer ? this.npc : this.player;
-
-        const dx = Math.sign(target.x - e.x), dy = Math.sign(target.y - e.y);
-        // Try primary, then secondary axis
-        const candidates = Math.abs(target.x-e.x) >= Math.abs(target.y-e.y)
-          ? [[dx,0],[0,dy],[0,-dy],[-dx,0]]
-          : [[0,dy],[dx,0],[-dx,0],[0,-dy]];
-
-        for (const [sx,sy] of candidates) {
-          if ((sx||sy) && this.canEnter(e.x+sx, e.y+sy)) {
-            e.x += sx; e.y += sy; break;
-          }
-        }
-      }
-    }
-
-    // Contact damage
-    for (const e of this.enemies) {
-      if (!e.alive) continue;
-      if (Math.hypot(e.x - this.npc.x,    e.y - this.npc.y)    <= 1) {
-        this.npc.health = Math.max(0, this.npc.health - 6);
-        this.sfx.playHit();
-        this.floatText(this.npc.x, this.npc.y, '-6', '#f87171');
-      }
-      if (Math.hypot(e.x - this.player.x, e.y - this.player.y) <= 1) {
-        this.player.health = Math.max(0, this.player.health - 6);
-        this.sfx.playHit();
-      }
-    }
+    // Static targets do not move or attack! They serve as stationary obstacles / target dummies.
+    // This guarantees deterministic, demo-ready rule demonstration without chaotic damage loops.
   }
 
   // ── Mission check ─────────────────────────────────────────────────────
   checkMission() {
     const map = MAPS[this.mapId];
-    const collected   = this.treasures.filter(t => t.collected).length;
-    const totalT      = this.treasures.length;
-    const enemiesAlive = this.enemies.filter(e => e.alive).length;
+    const collected    = this.treasures.filter(t => t.collected).length;
+    const totalT       = this.treasures.length;
+    const targetsAlive = this.enemies.filter(e => e.alive).length;
 
-    if (this.npc.health <= 0 || this.player.health <= 0) {
-      this.missionStatus = 'DEFEAT';
-    }
-    if (this.missionStatus !== 'ACTIVE') { this.pause(); return; }
+    if (this.missionStatus !== 'ACTIVE') return;
 
     if (map.missionType === 'EXTRACTION') {
       const atDoor = this.isDoor(this.npc.x, this.npc.y) || this.isDoor(this.player.x, this.player.y);
@@ -569,7 +550,7 @@ export class GameEngine {
         this.sfx.playVictory();
       }
     } else if (map.missionType === 'DEFENSE') {
-      if (enemiesAlive === 0 && this.enemies.length > 0) {
+      if (targetsAlive === 0 && this.enemies.length > 0) {
         this.missionStatus = 'VICTORY';
         this.sfx.playVictory();
       }
@@ -640,19 +621,24 @@ export class GameEngine {
       for (let c = 0; c < this.mapW; c++) {
         const px = c*ts, py = r*ts, t = this.tiles[r][c];
         if (t === '#') {
+          // Wall
           ctx.fillStyle = '#151e2e';
           ctx.fillRect(px+1, py+1, ts-2, ts-2);
           ctx.strokeStyle = '#1d2d45';
           ctx.lineWidth = 1;
           ctx.strokeRect(px+1.5, py+1.5, ts-3, ts-3);
         } else if (t === 'O') {
-          ctx.fillStyle = '#1a0a0e';
+          // Hazard pit
+          ctx.fillStyle = '#180e12';
           ctx.fillRect(px+2, py+2, ts-4, ts-4);
+          ctx.strokeStyle = 'rgba(239,68,68,0.4)';
+          ctx.strokeRect(px+3, py+3, ts-6, ts-6);
           ctx.fillStyle = '#ef4444';
           ctx.font = `11px 'Geist Mono', monospace`;
           ctx.textAlign = 'center';
           ctx.fillText('✕', px+ts/2, py+ts/2+4);
         } else if (t === 'D') {
+          // Exit gate
           const glow = 0.5 + 0.5 * Math.sin(this.time * 2);
           ctx.fillStyle = '#1c1708';
           ctx.fillRect(px+2, py+2, ts-4, ts-4);
@@ -662,7 +648,7 @@ export class GameEngine {
           ctx.fillStyle = `rgba(245,158,11,${0.7 + glow*0.3})`;
           ctx.font = `10px 'Geist Mono', monospace`;
           ctx.textAlign = 'center';
-          ctx.fillText('⊕', px+ts/2, py+ts/2+4);
+          ctx.fillText('⌑', px+ts/2, py+ts/2+4);
         }
       }
     }
@@ -670,7 +656,7 @@ export class GameEngine {
     // NPC trail
     if (this.npc.trail.length > 1) {
       for (let i = 1; i < this.npc.trail.length; i++) {
-        const alpha = i / this.npc.trail.length * 0.3;
+        const alpha = (i / this.npc.trail.length) * 0.35;
         ctx.strokeStyle = `rgba(56,189,248,${alpha})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -680,7 +666,7 @@ export class GameEngine {
       }
     }
 
-    // Treasures
+    // Treasures (Data Cores)
     for (const t of this.treasures) {
       if (t.collected) continue;
       const cx = t.x*ts+ts/2, cy = t.y*ts+ts/2;
@@ -691,18 +677,25 @@ export class GameEngine {
       ctx.fillText('◈', cx, cy+5);
     }
 
-    // Enemies
+    // Static Target Sentries (Do not attack; can be destroyed by NPC or Operator)
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const cx = e.x*ts+ts/2, cy = e.y*ts+ts/2;
 
-      // Enemy glyph
+      // Outer target ring
+      ctx.strokeStyle = 'rgba(248,113,113,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Static target glyph
       ctx.fillStyle = '#f87171';
-      ctx.font = `bold 15px 'Geist Mono', monospace`;
+      ctx.font = `bold 14px 'Geist Mono', monospace`;
       ctx.textAlign = 'center';
       ctx.fillText('◆', cx, cy+5);
 
-      // Health bar
+      // Target Health bar
       const bw = 18, bh = 3;
       ctx.fillStyle = 'rgba(15,23,42,0.8)';
       ctx.fillRect(cx-bw/2, cy-14, bw, bh);
@@ -753,15 +746,15 @@ export class GameEngine {
 
     // Mission overlay (Victory / Defeat)
     if (this.missionStatus !== 'ACTIVE') {
-      ctx.fillStyle = this.missionStatus === 'VICTORY' ? 'rgba(0,30,10,0.75)' : 'rgba(30,0,0,0.75)';
+      ctx.fillStyle = this.missionStatus === 'VICTORY' ? 'rgba(0,30,10,0.85)' : 'rgba(30,0,0,0.85)';
       ctx.fillRect(0, 0, W, H);
       const color = this.missionStatus === 'VICTORY' ? '#4ade80' : '#f87171';
       ctx.fillStyle = color;
-      ctx.font = `bold 24px 'Geist Mono', monospace`;
+      ctx.font = `bold 22px 'Geist Mono', monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(this.missionStatus === 'VICTORY' ? '✓ MISSION COMPLETE' : '✗ MISSION FAILED', W/2, H/2 - 10);
       ctx.font = `12px 'Geist Mono', monospace`;
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.fillText(`Score: ${this.npc.score}  ·  Cycles: ${this.cycle}`, W/2, H/2 + 18);
     }
   }
@@ -773,7 +766,7 @@ export class GameEngine {
 
     // Sensor ray
     ctx.save();
-    ctx.strokeStyle = 'rgba(56,189,248,0.35)';
+    ctx.strokeStyle = 'rgba(56,189,248,0.4)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 4]);
     ctx.beginPath();
@@ -798,20 +791,20 @@ export class GameEngine {
 
     // Active rule callout
     if (n.matchedRule) {
-      const txt = n.matchedRule.condition.replace(/_/g,' ') + ' → ' + n.matchedRule.action.replace(/_/g,' ');
-      ctx.font = `bold 8px 'Geist Mono', monospace`;
+      const txt = `${n.matchedRule.condition} → ${n.matchedRule.action}`;
+      ctx.font = `bold 8.5px 'Geist Mono', monospace`;
       const tw = ctx.measureText(txt).width;
 
-      ctx.fillStyle = 'rgba(9,12,20,0.92)';
+      ctx.fillStyle = 'rgba(9,12,20,0.95)';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(cx - tw/2 - 5, cy - 26, tw + 10, 14, 3);
+      ctx.roundRect(cx - tw/2 - 6, cy - 28, tw + 12, 16, 3);
       ctx.fill(); ctx.stroke();
 
       ctx.fillStyle = '#38bdf8';
       ctx.textAlign = 'center';
-      ctx.fillText(txt, cx, cy - 16);
+      ctx.fillText(txt, cx, cy - 17);
     }
   }
 }
