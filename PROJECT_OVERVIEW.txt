@@ -1,0 +1,90 @@
+================================================================================
+NPC BEHAVIOR COMPILER & 2D TACTICAL SIMULATION WORKBENCH
+Project Overview & Architecture Summary
+================================================================================
+
+1. WHAT IS THIS PROJECT?
+--------------------------------------------------------------------------------
+This project is an end-to-end Compiler Pipeline & 2D Autonomous Simulation
+Workbench. It allows developers to author robot/NPC behaviors in a custom
+reactive Domain-Specific Language (DSL), compiles the code through a 9-stage
+production compiler pipeline, and executes the emitted bytecode in a real-time
+tactical 2D grid world.
+
+2. THE REACTIVE DSL
+--------------------------------------------------------------------------------
+The language maps environmental perception (Sensors) to physical actuators (Actions):
+
+    NPC MasterBot {
+        WHEN HEALTH_LOW:    STOP          // Emergency self-repair
+        WHEN PIT_AHEAD:     JUMP          // Hydraulic gap leap
+        WHEN WALL_AHEAD:    TURN_RIGHT    // Obstacle avoidance
+        WHEN ENEMY_NEAR:    ATTACK        // Sentry plasma strike
+        WHEN TREASURE_NEAR: COLLECT       // Data core siphon
+        WHEN PLAYER_SEEN:   CHASE         // Optical line-of-sight tracking
+        WHEN PLAYER_NEAR:   RUN_AWAY      // Tactical spacing from operator
+        WHEN DOOR_AHEAD:    STOP          // Extraction gate hold
+        WHEN PATH_CLEAR:    MOVE_FORWARD  // Default corridor cruising
+    }
+
+3. THE 9-STAGE COMPILER PIPELINE
+--------------------------------------------------------------------------------
+01. LEXER:
+    Scans raw source text into categorized tokens (keywords, sensors, actions,
+    delimiters) with line & column metrics.
+
+02. AUTOMATA:
+    Constructs formal Thompson NFA and subset-construction DFA state machines
+    recognizing language tokens and transitions.
+
+03. PARSER (CST):
+    Builds a Concrete Syntax Tree using LL(1) grammar productions with syntax
+    validation and parse error recovery.
+
+04. AST:
+    Strips grammatical boilerplate into a hierarchical Abstract Syntax Tree
+    representing meaningful program structure.
+
+05. SEMANTIC ANALYSIS:
+    Constructs a scoped Symbol Table and enforces strict sensor-actuator
+    compatibility checks (e.g. catches errors like "WHEN WALL_AHEAD: JUMP").
+
+06. CONTROL FLOW GRAPH (CFG):
+    Partitions program flow into Basic Blocks with directed branch edges,
+    condition evaluations, and fallbacks.
+
+07. INTERMEDIATE REPRESENTATION (IR):
+    Emits linear Three-Address Code (3AC) quadruples for platform-independent
+    representation.
+
+08. OPTIMIZER:
+    Applies dominance pruning, dead code elimination, and table packing with
+    a side-by-side Before/After diff and reduction metrics.
+
+09. CODE GENERATION:
+    Generates target VM bytecode, jump addresses, and assembly-style actuator
+    dispatch tables.
+
+4. REAL-TIME 2D TACTICAL SIMULATOR
+--------------------------------------------------------------------------------
+- NPC Agent (▲): Autonomous actor driven 100% by compiled bytecode rules.
+- Operator (◉): Player-controlled companion (WASD navigation + Space melee).
+- World Elements:
+    • Solid Walls (#): Blocks line-of-sight and movement.
+    • Hazard Pits (O): Gaps requiring JUMP actuator.
+    • Target Sentries (◆): Static defense dummies destructible by NPC/Player.
+    • Data Cores (◈): Energy treasures to collect (+150 pts).
+    • Exit Gate (⌑): Vault portal unlocking when all cores are gathered.
+- Live Telemetry:
+    • 9-Sensor radar array with live activity LEDs.
+    • Real-time rule firing indicator (#Priority: Condition -> Action).
+    • Health, cycle count, score, and heading monitors.
+
+5. TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+• Frontend: React 19, Vite, Tailwind CSS, Canvas API, Geist Typography
+• Backend: Python 3.11, FastAPI, Uvicorn, Pydantic, Pytest
+• Deployment: Docker multi-stage build, Render.com blueprint ready (render.yaml)
+• Architecture: Dual-mode execution (Client-side instant compilation + FastAPI
+  production REST API with /api/compile and /api/health).
+================================================================================
