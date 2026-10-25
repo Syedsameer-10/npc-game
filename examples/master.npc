@@ -1,0 +1,37 @@
+NPC MasterBot {
+    // 01. Emergency Self-Repair when shield is damaged
+    WHEN HEALTH_LOW:
+        STOP
+
+    // 02. Hazard Avoidance: Leap over hazard pits
+    WHEN PIT_AHEAD:
+        JUMP
+
+    // 03. Navigation: Turn clockwise at walls
+    WHEN WALL_AHEAD:
+        TURN_RIGHT
+
+    // 04. Tactical Combat: Eliminate hostile sentries
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    // 05. Resource Acquisition: Siphon nearby data cores
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    // 06. Optical Tracking: Pursue human operator on sight
+    WHEN PLAYER_SEEN:
+        CHASE
+
+    // 07. Tactical Spacing: Disengage when operator is too close
+    WHEN PLAYER_NEAR:
+        RUN_AWAY
+
+    // 08. Checkpoint Extraction: Hold position at exit gate
+    WHEN DOOR_AHEAD:
+        STOP
+
+    // 09. Default Locomotion: Advance through open corridors
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}

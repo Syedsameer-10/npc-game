@@ -5,7 +5,7 @@ import CompileOverlay from './components/CompileOverlay'
 import CompilerWorkbench from './components/CompilerWorkbench'
 import GameSection from './components/GameSection'
 import PhasesPage from './pages/PhasesPage'
-import { compile, PRESETS } from './compiler/compiler'
+import { compile, MASTER_PROGRAM } from './compiler/compiler'
 
 const LOADER_DELAY_MS = 140
 
@@ -20,8 +20,8 @@ function useHash() {
 }
 
 export default function App() {
-  const [source, setSource]           = useState(PRESETS.guard)
-  const [result, setResult]           = useState(() => compile(PRESETS.guard))
+  const [source, setSource]           = useState(MASTER_PROGRAM)
+  const [result, setResult]           = useState(() => compile(MASTER_PROGRAM))
   const [loading, setLoading]         = useState(false)
   const [loaderPhase, setLoaderPhase] = useState(-1)
   const gameRef                       = useRef(null)

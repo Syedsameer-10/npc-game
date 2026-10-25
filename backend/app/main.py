@@ -48,6 +48,12 @@ async def get_presets():
     """Returns preset example scripts."""
     presets = [
         {
+            "id": "master",
+            "title": "Master NPC Program",
+            "description": "Unified autonomous agent incorporating all 9 sensors and 9 actions in a balanced tactical hierarchy.",
+            "filename": "master.npc",
+        },
+        {
             "id": "guard",
             "title": "Guard NPC",
             "description": "Standard defensive guard that jumps pits, attacks enemies, chases player, and turns at walls.",

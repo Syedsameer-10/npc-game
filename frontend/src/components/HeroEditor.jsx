@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { PRESETS } from '../compiler/compiler'
+import { MASTER_PROGRAM } from '../compiler/compiler'
 
 const SENSORS = [
   { name: 'WALL_AHEAD',    desc: 'Obstacle directly ahead' },
@@ -34,7 +34,6 @@ const GRAMMAR = [
 export default function HeroEditor({ source, setSource, onCompile, hasResult }) {
   const textareaRef = useRef(null)
   const gutterRef   = useRef(null)
-  const [preset, setPreset]       = useState('guard')
   const [activeTab, setActiveTab] = useState('sensors')
 
   const lines = source.split('\n')
@@ -45,10 +44,9 @@ export default function HeroEditor({ source, setSource, onCompile, hasResult }) 
     }
   }
 
-  const handlePreset = (e) => {
-    const key = e.target.value
-    setPreset(key)
-    setSource(PRESETS[key] || '')
+  const handleResetDefault = () => {
+    setSource(MASTER_PROGRAM)
+    requestAnimationFrame(() => onCompile())
   }
 
   const handleKey = (e) => {
@@ -184,48 +182,43 @@ export default function HeroEditor({ source, setSource, onCompile, hasResult }) 
                 style={{
                   fontFamily: "'Geist Mono', monospace",
                   fontSize: 11,
-                  color: 'var(--text-3)',
+                  color: 'var(--text-2)',
                   marginLeft: 4,
+                  fontWeight: 500,
                 }}
               >
-                {preset}.npc
+                master.npc
               </span>
             </div>
 
-            {/* Preset selector */}
+            {/* Quick Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span
+              <button
+                onClick={handleResetDefault}
+                title="Reset to default Master Program (all 9 sensors & actions)"
                 style={{
                   fontFamily: "'Geist Mono', monospace",
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  color: 'var(--text-3)',
-                }}
-              >
-                Preset
-              </span>
-              <select
-                value={preset}
-                onChange={handlePreset}
-                style={{
-                  fontFamily: "'Geist Mono', monospace",
-                  fontSize: 11,
-                  padding: '3px 8px',
+                  fontSize: 10.5,
+                  padding: '3px 9px',
                   borderRadius: 4,
                   border: '1px solid var(--border-md)',
                   background: 'var(--surface)',
-                  color: 'var(--text-1)',
-                  outline: 'none',
+                  color: 'var(--text-2)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
                   cursor: 'pointer',
+                  transition: 'all 0.15s',
                 }}
               >
-                <option value="guard">Guard (Combat & Pit Jump)</option>
-                <option value="collector">Collector (Loot & Evasion)</option>
-                <option value="patrol">Patrol (Sighted Chase & Melee)</option>
-                <option value="survivor">Survivor (Health Low & Repair)</option>
-                <option value="infiltrator">Infiltrator (Extraction & Door)</option>
-              </select>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  <path d="M3 21v-5h5" />
+                </svg>
+                Reset Default
+              </button>
             </div>
           </div>
 

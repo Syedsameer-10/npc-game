@@ -784,93 +784,50 @@ export const STAGE_CONFIG = [
   { id: 'codegen', num: 9, name: 'CodeGen', title: 'Target Code Generation', desc: 'Emits target VM bytecode and assembly dispatch table', icon: '09' },
 ];
 
-export const PRESETS = {
-  guard: `NPC Guard {
-
-    WHEN WALL_AHEAD:
-        TURN_LEFT
-
-    WHEN PIT_AHEAD:
-        JUMP
-
-    WHEN ENEMY_NEAR:
-        ATTACK
-
-    WHEN PLAYER_SEEN:
-        CHASE
-
-    WHEN PATH_CLEAR:
-        MOVE_FORWARD
-}`,
-  collector: `NPC Collector {
-
-    WHEN TREASURE_NEAR:
-        COLLECT
-
-    WHEN ENEMY_NEAR:
-        RUN_AWAY
-
-    WHEN WALL_AHEAD:
-        TURN_RIGHT
-
-    WHEN PIT_AHEAD:
-        JUMP
-
-    WHEN PATH_CLEAR:
-        MOVE_FORWARD
-}`,
-  patrol: `NPC Patrol {
-
-    WHEN WALL_AHEAD:
-        TURN_RIGHT
-
-    WHEN PLAYER_SEEN:
-        CHASE
-
-    WHEN PLAYER_NEAR:
-        ATTACK
-
-    WHEN PATH_CLEAR:
-        MOVE_FORWARD
-}`,
-  survivor: `NPC Survivor {
-
+export const MASTER_PROGRAM = `NPC MasterBot {
+    // 01. Emergency Self-Repair when shield is damaged
     WHEN HEALTH_LOW:
         STOP
 
-    WHEN ENEMY_NEAR:
-        RUN_AWAY
-
+    // 02. Hazard Avoidance: Leap over hazard pits
     WHEN PIT_AHEAD:
         JUMP
 
-    WHEN WALL_AHEAD:
-        TURN_LEFT
-
-    WHEN TREASURE_NEAR:
-        COLLECT
-
-    WHEN PATH_CLEAR:
-        MOVE_FORWARD
-}`,
-  infiltrator: `NPC Infiltrator {
-
-    WHEN DOOR_AHEAD:
-        STOP
-
-    WHEN TREASURE_NEAR:
-        COLLECT
-
-    WHEN ENEMY_NEAR:
-        ATTACK
-
-    WHEN PIT_AHEAD:
-        JUMP
-
+    // 03. Navigation: Turn clockwise at walls
     WHEN WALL_AHEAD:
         TURN_RIGHT
 
+    // 04. Tactical Combat: Eliminate hostile sentries
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    // 05. Resource Acquisition: Siphon nearby data cores
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    // 06. Optical Tracking: Pursue human operator on sight
+    WHEN PLAYER_SEEN:
+        CHASE
+
+    // 07. Tactical Spacing: Disengage when operator is too close
+    WHEN PLAYER_NEAR:
+        RUN_AWAY
+
+    // 08. Checkpoint Extraction: Hold position at exit gate
+    WHEN DOOR_AHEAD:
+        STOP
+
+    // 09. Default Locomotion: Advance through open corridors
     WHEN PATH_CLEAR:
         MOVE_FORWARD
-}`,
+}`;
+
+export const PRESETS = {
+  master: MASTER_PROGRAM,
+  // Backwards compatibility aliases
+  guard: MASTER_PROGRAM,
+  collector: MASTER_PROGRAM,
+  patrol: MASTER_PROGRAM,
+  survivor: MASTER_PROGRAM,
+  infiltrator: MASTER_PROGRAM,
 };
