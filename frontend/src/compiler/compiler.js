@@ -793,7 +793,7 @@ export const MASTER_PROGRAM = `NPC MasterBot {
     WHEN PIT_AHEAD:
         JUMP
 
-    // 03. Navigation: Turn clockwise at walls
+    // 03. Navigation: 50/50 turn left or right at walls
     WHEN WALL_AHEAD:
         TURN_RIGHT
 

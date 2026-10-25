@@ -27,7 +27,7 @@ The DSL is designed around reactive sensor-actuator mappings:
     NPC MasterBot {
         WHEN HEALTH_LOW:    STOP          // Field self-repair
         WHEN PIT_AHEAD:     JUMP          // Obstacle leap
-        WHEN WALL_AHEAD:    TURN_RIGHT    // Boundary evasion
+        WHEN WALL_AHEAD:    TURN_RIGHT    // 50/50 left or right evasion
         WHEN ENEMY_NEAR:    ATTACK        // Sentry elimination
         WHEN TREASURE_NEAR: COLLECT       // Data core harvesting
         WHEN PLAYER_SEEN:   CHASE         // Optical line-of-sight tracking
