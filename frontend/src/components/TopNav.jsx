@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { checkBackendHealth } from '../compiler/api'
 
 export const PHASE_LABELS = [
   'Tokens', 'NFA / DFA', 'Grammar', 'AST',
@@ -7,11 +8,25 @@ export const PHASE_LABELS = [
 
 export default function TopNav({ result, onCompile }) {
   const [scrolled, setScrolled] = useState(false)
+  const [apiOnline, setApiOnline] = useState(null)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    checkBackendHealth().then(status => {
+      if (mounted) setApiOnline(!!status)
+    })
+    const timer = setInterval(() => {
+      checkBackendHealth().then(status => {
+        if (mounted) setApiOnline(!!status)
+      })
+    }, 15000)
+    return () => { mounted = false; clearInterval(timer) }
   }, [])
 
   const hasResult = !!result
@@ -88,6 +103,34 @@ export default function TopNav({ result, onCompile }) {
           }}
         >
           DSL v1.0
+        </span>
+        <span
+          title={apiOnline === true ? "FastAPI Backend Connected" : apiOnline === false ? "FastAPI Backend Offline / Waking Up" : "Checking Backend Status..."}
+          style={{
+            fontFamily: "'Geist Mono', monospace",
+            fontSize: 9.5,
+            fontWeight: 500,
+            padding: '2px 7px',
+            borderRadius: 4,
+            border: apiOnline ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border)',
+            background: apiOnline ? 'rgba(34,197,94,0.06)' : 'var(--surface-2)',
+            color: apiOnline ? '#059669' : 'var(--text-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4.5,
+            letterSpacing: '0.04em',
+          }}
+        >
+          <span
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: apiOnline === true ? '#22c55e' : apiOnline === false ? '#94a3b8' : '#f59e0b',
+              display: 'inline-block',
+            }}
+          />
+          {apiOnline === true ? 'API LIVE' : apiOnline === false ? 'CLIENT ONLY' : 'CONNECTING'}
         </span>
       </a>
 

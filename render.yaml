@@ -1,0 +1,55 @@
+# =========================================================================
+# Render.com Blueprint (render.yaml)
+# NPC Behavior Compiler & Simulation Workbench
+# Docs: https://render.com/docs/blueprint-spec
+# =========================================================================
+
+services:
+  # -----------------------------------------------------------------------
+  # UNIFIED WEB SERVICE (Recommended)
+  # Deploys both FastAPI backend and React frontend under a single URL.
+  # Eliminates CORS issues and optimizes Render's free tier.
+  # -----------------------------------------------------------------------
+  - type: web
+    name: npc-behavior-compiler
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+
+# -------------------------------------------------------------------------
+# ALTERNATIVE: Separate Services Blueprint
+# If you prefer running Frontend as a Static Site and Backend as a Web Service,
+# you can use the configurations below in Render Dashboard or uncomment them:
+#
+#   # Backend Web Service:
+#   - type: web
+#     name: npc-compiler-api
+#     runtime: python
+#     plan: free
+#     buildCommand: pip install -r requirements.txt
+#     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+#     healthCheckPath: /api/health
+#
+#   # Frontend Static Site:
+#   - type: static
+#     name: npc-compiler-ui
+#     plan: free
+#     rootDir: frontend
+#     buildCommand: npm install && npm run build
+#     staticPublishPath: dist
+#     routes:
+#       - type: rewrite
+#         source: /*
+#         destination: /index.html
+#     envVars:
+#       - key: VITE_API_URL
+#         fromService:
+#           type: web
+#           name: npc-compiler-api
+#           property: host
+# -------------------------------------------------------------------------

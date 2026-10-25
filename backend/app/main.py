@@ -84,17 +84,36 @@ async def get_presets():
     return result
 
 
+@app.get("/api/health")
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Render service monitoring."""
+    return {
+        "status": "healthy",
+        "service": "npc-behavior-compiler",
+        "version": "1.0.0",
+    }
+
+
 # Mount frontend static or built dist files if directory exists
 DIST_DIR = FRONTEND_DIR / "dist"
 if DIST_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
+    assets_dir = DIST_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-    @app.get("/")
-    async def serve_index():
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # 1. Direct file lookup in dist (e.g. vite.svg, favicon.ico)
+        if full_path:
+            file_path = DIST_DIR / full_path
+            if file_path.exists() and file_path.is_file():
+                return FileResponse(str(file_path))
+        # 2. SPA index fallback
         index_file = DIST_DIR / "index.html"
         if index_file.exists():
             return FileResponse(str(index_file))
-        return {"message": "NPC Behavior Compiler Backend is Running"}
+        return {"status": "healthy", "service": "npc-behavior-compiler"}
 elif FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
@@ -103,4 +122,4 @@ elif FRONTEND_DIR.exists():
         index_file = FRONTEND_DIR / "index.html"
         if index_file.exists():
             return FileResponse(str(index_file))
-        return {"message": "NPC Behavior Compiler Backend is Running"}
+        return {"status": "healthy", "service": "npc-behavior-compiler"}
