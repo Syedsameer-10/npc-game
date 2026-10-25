@@ -220,9 +220,11 @@ export default function HeroEditor({ source, setSource, onCompile, hasResult }) 
                   cursor: 'pointer',
                 }}
               >
-                <option value="guard">Guard</option>
-                <option value="collector">Collector</option>
-                <option value="patrol">Patrol</option>
+                <option value="guard">Guard (Combat & Pit Jump)</option>
+                <option value="collector">Collector (Loot & Evasion)</option>
+                <option value="patrol">Patrol (Sighted Chase & Melee)</option>
+                <option value="survivor">Survivor (Health Low & Repair)</option>
+                <option value="infiltrator">Infiltrator (Extraction & Door)</option>
               </select>
             </div>
           </div>

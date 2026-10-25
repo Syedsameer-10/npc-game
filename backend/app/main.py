@@ -65,6 +65,18 @@ async def get_presets():
             "description": "Patrols open areas, turns on walls, chases any sighted player and attacks when close.",
             "filename": "patrol.npc",
         },
+        {
+            "id": "survivor",
+            "title": "Survivor NPC",
+            "description": "Tactical retreat NPC that runs from enemies, jumps hazard pits, gathers cores, and halts to self-repair when health is low.",
+            "filename": "survivor.npc",
+        },
+        {
+            "id": "infiltrator",
+            "title": "Infiltrator NPC",
+            "description": "Extraction specialist that collects data cores, neutralizes sentries, jumps pits, and locks down at the exit gate.",
+            "filename": "infiltrator.npc",
+        },
     ]
 
     result: List[PresetExample] = []

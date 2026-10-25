@@ -833,4 +833,44 @@ export const PRESETS = {
     WHEN PATH_CLEAR:
         MOVE_FORWARD
 }`,
+  survivor: `NPC Survivor {
+
+    WHEN HEALTH_LOW:
+        STOP
+
+    WHEN ENEMY_NEAR:
+        RUN_AWAY
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN WALL_AHEAD:
+        TURN_LEFT
+
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}`,
+  infiltrator: `NPC Infiltrator {
+
+    WHEN DOOR_AHEAD:
+        STOP
+
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN WALL_AHEAD:
+        TURN_RIGHT
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}`,
 };

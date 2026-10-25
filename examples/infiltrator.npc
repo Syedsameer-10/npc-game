@@ -1,0 +1,19 @@
+NPC Infiltrator {
+    WHEN DOOR_AHEAD:
+        STOP
+
+    WHEN TREASURE_NEAR:
+        COLLECT
+
+    WHEN ENEMY_NEAR:
+        ATTACK
+
+    WHEN PIT_AHEAD:
+        JUMP
+
+    WHEN WALL_AHEAD:
+        TURN_RIGHT
+
+    WHEN PATH_CLEAR:
+        MOVE_FORWARD
+}

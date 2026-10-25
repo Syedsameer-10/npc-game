@@ -312,12 +312,13 @@ export class GameEngine {
   operatorAttack() {
     if (this.missionStatus !== 'ACTIVE') return;
     let hit = false;
+    // 1. Strike adjacent static sentry
     for (const e of this.enemies) {
       if (e.alive && Math.hypot(e.x - this.player.x, e.y - this.player.y) <= 1.5) {
         e.health -= 30;
         this.sfx.playAttack();
         this.burst(e.x * TS + TS/2, e.y * TS + TS/2, '#f87171', 8);
-        this.floatText(e.x, e.y, '-30', '#f87171');
+        this.floatText(e.x, e.y, '-30 HIT', '#f87171');
         if (e.health <= 0) {
           e.alive = false;
           this.npc.score += 150;
@@ -326,6 +327,14 @@ export class GameEngine {
         hit = true;
         break;
       }
+    }
+    // 2. Spar with NPC if adjacent (allows manual demo testing of HEALTH_LOW trigger)
+    if (!hit && Math.hypot(this.npc.x - this.player.x, this.npc.y - this.player.y) <= 1.5) {
+      this.npc.health = Math.max(15, this.npc.health - 25);
+      this.sfx.playAttack();
+      this.burst(this.npc.x * TS + TS/2, this.npc.y * TS + TS/2, '#f97316', 8);
+      this.floatText(this.npc.x, this.npc.y, '-25 HP SPAR', '#f97316');
+      hit = true;
     }
     if (!hit) return;
     this.checkMission();
@@ -429,8 +438,9 @@ export class GameEngine {
 
       case 'ATTACK': {
         let attacked = false;
+        // 1. Strike static sentry in melee range
         for (const e of this.enemies) {
-          if (e.alive && Math.hypot(e.x - n.x, e.y - n.y) <= 2.0) {
+          if (e.alive && Math.hypot(e.x - n.x, e.y - n.y) <= 1.8) {
             e.health -= 30;
             this.sfx.playAttack();
             this.burst(e.x * TS + TS/2, e.y * TS + TS/2, '#f87171', 10);
@@ -444,11 +454,18 @@ export class GameEngine {
             break;
           }
         }
-        // If target not reached yet, advance toward nearest target
+        // 2. Strike player if PLAYER_NEAR triggered attack
+        if (!attacked && Math.hypot(this.player.x - n.x, this.player.y - n.y) <= 1.8) {
+          this.sfx.playAttack();
+          this.burst(this.player.x * TS + TS/2, this.player.y * TS + TS/2, '#f97316', 8);
+          this.floatText(this.player.x, this.player.y, 'NPC MELEE', '#f97316');
+          attacked = true;
+        }
+        // 3. If target not reached yet, advance toward designated target
         if (!attacked) {
-          const nearest = this.nearestEnemy(n.x, n.y);
-          if (nearest) {
-            const dx = nearest.x - n.x, dy = nearest.y - n.y;
+          const target = (n.matchedRule?.condition?.includes('PLAYER') ? this.player : this.nearestEnemy(n.x, n.y)) || this.player;
+          if (target) {
+            const dx = target.x - n.x, dy = target.y - n.y;
             if (Math.abs(dx) >= Math.abs(dy)) { mv(Math.sign(dx), 0); n.dir = dx > 0 ? 'RIGHT' : 'LEFT'; }
             else { mv(0, Math.sign(dy)); n.dir = dy > 0 ? 'DOWN' : 'UP'; }
           } else {
@@ -459,8 +476,7 @@ export class GameEngine {
       }
 
       case 'CHASE': {
-        // Chase nearest target or player
-        const target = this.nearestEnemy(n.x, n.y) || this.player;
+        const target = (n.matchedRule?.condition?.includes('PLAYER') ? this.player : this.nearestEnemy(n.x, n.y)) || this.player;
         const dx = target.x - n.x, dy = target.y - n.y;
         if (Math.abs(dx) >= Math.abs(dy)) {
           const s = dx > 0 ? 1 : -1;
@@ -477,12 +493,14 @@ export class GameEngine {
       }
 
       case 'RUN_AWAY': {
-        const threat = this.nearestEnemy(n.x, n.y) || this.player;
-        const dx = n.x - threat.x, dy = n.y - threat.y;
-        const sx = Math.sign(dx) || 1, sy = Math.sign(dy) || 1;
-        if (this.canEnter(n.x + sx, n.y)) { mv(sx, 0); n.dir = sx > 0 ? 'RIGHT' : 'LEFT'; }
-        else if (this.canEnter(n.x, n.y + sy)) { mv(0, sy); n.dir = sy > 0 ? 'DOWN' : 'UP'; }
-        else { n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4]; }
+        const threat = (n.matchedRule?.condition?.includes('PLAYER') ? this.player : this.nearestEnemy(n.x, n.y)) || this.player;
+        if (threat) {
+          const dx = n.x - threat.x, dy = n.y - threat.y;
+          const sx = Math.sign(dx) || 1, sy = Math.sign(dy) || 1;
+          if (this.canEnter(n.x + sx, n.y)) { mv(sx, 0); n.dir = sx > 0 ? 'RIGHT' : 'LEFT'; }
+          else if (this.canEnter(n.x, n.y + sy)) { mv(0, sy); n.dir = sy > 0 ? 'DOWN' : 'UP'; }
+          else { n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4]; }
+        }
         break;
       }
 
@@ -512,9 +530,10 @@ export class GameEngine {
       }
 
       case 'STOP':
-        // Slowly regenerate health when stopped
+        // Slowly regenerate health when stopped (self-repair mode)
         if (n.health < n.maxHealth) {
           n.health = Math.min(n.maxHealth, n.health + 4);
+          this.floatText(n.x, n.y, '+4 REPAIR', '#38bdf8');
         }
         break;
 
