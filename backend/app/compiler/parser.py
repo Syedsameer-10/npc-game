@@ -103,7 +103,7 @@ class Parser:
         return NPCNode(name=npc_name, rules=rules, line=npc_kw.line, column=npc_kw.column)
 
     def _parse_rule(self) -> RuleNode:
-        """WHEN CONDITION COLON ACTION"""
+        """WHEN CONDITION [ ( PROBABILITY ) ] COLON ACTION [ | ACTION ]*"""
         when_tok = self._match(TokenType.WHEN)
 
         # Condition
@@ -115,6 +115,19 @@ class Parser:
                 column=cond_tok.column,
             )
         self.pos += 1
+
+        # Optional probability: (50%) or (0.5)
+        probability = 1.0
+        if self._current().type == TokenType.LPAREN:
+            self.pos += 1
+            num_tok = self._match(TokenType.NUMBER)
+            val = float(num_tok.value)
+            if self._current().type == TokenType.PERCENT:
+                self.pos += 1
+                val = val / 100.0
+            self._match(TokenType.RPAREN)
+            probability = val
+
         condition_node = ConditionNode(
             name=cond_tok.value, line=cond_tok.line, column=cond_tok.column
         )
@@ -129,7 +142,7 @@ class Parser:
             )
         self.pos += 1
 
-        # Action
+        # Primary Action
         act_tok = self._current()
         if act_tok.type != TokenType.ACTION:
             raise ParseError(
@@ -138,8 +151,26 @@ class Parser:
                 column=act_tok.column,
             )
         self.pos += 1
+
+        alternatives = [act_tok.value]
+        # Check for alternative stochastic actions: ACTION | ACTION
+        while self._current().type == TokenType.PIPE:
+            self.pos += 1  # consume '|'
+            next_act = self._current()
+            if next_act.type != TokenType.ACTION:
+                raise ParseError(
+                    f"Expected action after '|', got '{next_act.value}'",
+                    line=next_act.line,
+                    column=next_act.column,
+                )
+            self.pos += 1
+            alternatives.append(next_act.value)
+
+        is_stochastic = len(alternatives) > 1 or probability < 1.0
+        combined_name = " | ".join(alternatives) if len(alternatives) > 1 else act_tok.value
+
         action_node = ActionNode(
-            name=act_tok.value, line=act_tok.line, column=act_tok.column
+            name=combined_name, line=act_tok.line, column=act_tok.column
         )
 
         return RuleNode(
@@ -147,4 +178,7 @@ class Parser:
             action=action_node,
             line=when_tok.line,
             column=when_tok.column,
+            alternatives=alternatives,
+            is_stochastic=is_stochastic,
+            probability=probability,
         )

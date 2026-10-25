@@ -90,8 +90,8 @@ class SemanticAnalyzer:
         cond_name = rule.condition.name
         act_name = rule.action.name
 
-        # 1. Duplicate condition check (Warning)
-        if cond_name in self.seen_conditions:
+        # 1. Duplicate condition check (Warning if non-probabilistic)
+        if cond_name in self.seen_conditions and rule.probability >= 1.0:
             self.warnings.append(
                 SemanticDiagnostic(
                     severity="warning",
@@ -107,17 +107,19 @@ class SemanticAnalyzer:
         # 2. Compatibility check (Error)
         allowed_actions = CONDITION_ACTION_COMPATIBILITY.get(cond_name)
         if allowed_actions is not None:
-            if act_name not in allowed_actions:
-                valid_list = ", ".join(sorted(allowed_actions))
-                self.errors.append(
-                    SemanticDiagnostic(
-                        severity="error",
-                        message=f"Action '{act_name}' is not valid for condition '{cond_name}'.",
-                        line=rule.action.line,
-                        column=rule.action.column,
-                        suggestion=f"Valid actions for '{cond_name}': {valid_list}",
+            actions_to_check = getattr(rule, "alternatives", [act_name])
+            for single_act in actions_to_check:
+                if single_act not in allowed_actions:
+                    valid_list = ", ".join(sorted(allowed_actions))
+                    self.errors.append(
+                        SemanticDiagnostic(
+                            severity="error",
+                            message=f"Action '{single_act}' is not valid for condition '{cond_name}'.",
+                            line=rule.action.line,
+                            column=rule.action.column,
+                            suggestion=f"Valid actions for '{cond_name}': {valid_list}",
+                        )
                     )
-                )
         else:
             self.errors.append(
                 SemanticDiagnostic(

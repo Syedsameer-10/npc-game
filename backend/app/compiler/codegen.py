@@ -25,6 +25,9 @@ class CodeGenerator:
                 "condition": inst.condition,
                 "action": inst.action,
                 "priority": inst.priority,
+                "isStochastic": inst.is_stochastic,
+                "alternatives": inst.alternatives,
+                "probability": inst.probability,
                 "isActive": is_active,
                 "sourceLine": inst.line,
             })

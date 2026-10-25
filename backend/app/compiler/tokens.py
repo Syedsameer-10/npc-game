@@ -22,6 +22,11 @@ class TokenType(str, Enum):
     LBRACE = "LBRACE"
     RBRACE = "RBRACE"
     COLON = "COLON"
+    PIPE = "PIPE"
+    LPAREN = "LPAREN"
+    RPAREN = "RPAREN"
+    PERCENT = "PERCENT"
+    NUMBER = "NUMBER"
 
     # Special
     EOF = "EOF"

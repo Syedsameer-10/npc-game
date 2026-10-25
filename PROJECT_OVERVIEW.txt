@@ -27,7 +27,7 @@ The DSL is designed around reactive sensor-actuator mappings:
     NPC MasterBot {
         WHEN HEALTH_LOW:    STOP          // Field self-repair
         WHEN PIT_AHEAD:     JUMP          // Obstacle leap
-        WHEN WALL_AHEAD:    TURN_RIGHT    // 50/50 left or right evasion
+        WHEN WALL_AHEAD:    TURN_LEFT | TURN_RIGHT // 50/50 stochastic evasion
         WHEN ENEMY_NEAR:    ATTACK        // Sentry elimination
         WHEN TREASURE_NEAR: COLLECT       // Data core harvesting
         WHEN PLAYER_SEEN:   CHASE         // Optical line-of-sight tracking
@@ -39,7 +39,8 @@ The DSL is designed around reactive sensor-actuator mappings:
 Formal LL(1) Grammar (BNF):
   <Program>    ::= NPC <Identifier> "{" <RuleList> "}" <EOF>
   <RuleList>   ::= <Rule> <RuleList> | ε
-  <Rule>       ::= WHEN <Condition> ":" <Action>
+  <Rule>       ::= WHEN <Condition> [ "(" <Probability> ")" ] ":" <ActionExpr>
+  <ActionExpr> ::= <Action> [ "|" <Action> ]*
   <Condition>  ::= WALL_AHEAD | PIT_AHEAD | PATH_CLEAR | ENEMY_NEAR |
                    PLAYER_SEEN | PLAYER_NEAR | TREASURE_NEAR |
                    HEALTH_LOW | DOOR_AHEAD

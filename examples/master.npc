@@ -7,9 +7,9 @@ NPC MasterBot {
     WHEN PIT_AHEAD:
         JUMP
 
-    // 03. Navigation: 50/50 turn left or right at walls
+    // 03. Navigation: Compiler-level 50/50 stochastic turn at walls
     WHEN WALL_AHEAD:
-        TURN_RIGHT
+        TURN_LEFT | TURN_RIGHT
 
     // 04. Tactical Combat: Eliminate hostile sentries
     WHEN ENEMY_NEAR:

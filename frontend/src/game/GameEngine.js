@@ -383,8 +383,26 @@ export class GameEngine {
     n.action = 'STOP'; // default fallback
     for (const r of n.rules) {
       if (n.conditions[r.condition]) {
+        // 1. If rule has compiler probability weight: WHEN COND (50%): ...
+        if (r.probability && r.probability < 1.0) {
+          if (Math.random() <= r.probability) {
+            n.matchedRule = r;
+            n.action = r.action;
+            break;
+          }
+          // Probability branch not taken; continue to evaluate next matching rule
+          continue;
+        }
+
         n.matchedRule = r;
-        n.action = r.action;
+        // 2. If rule has compiled stochastic alternatives: WHEN WALL_AHEAD: TURN_LEFT | TURN_RIGHT
+        if (r.isStochastic && r.alternatives && r.alternatives.length > 1) {
+          const pick = Math.random() < 0.5 ? r.alternatives[0] : r.alternatives[1];
+          n.action = pick;
+          this.floatText(n.x, n.y, `50/50 ➔ ${pick.replace('TURN_', '')}`, '#38bdf8');
+        } else {
+          n.action = r.action;
+        }
         break; // first-match-priority
       }
     }
@@ -408,42 +426,12 @@ export class GameEngine {
         break;
 
       case 'TURN_LEFT':
-      case 'TURN_RIGHT': {
-        // When facing a wall, apply 50/50 Left or Right stochastic choice with obstacle awareness
-        if (n.conditions.WALL_AHEAD) {
-          const leftDir = DIRS[(DIRS.indexOf(n.dir) + 3) % 4];
-          const rightDir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4];
-          const leftVec = DVec[leftDir];
-          const rightVec = DVec[rightDir];
-          const leftClear = this.canEnter(n.x + leftVec.dx, n.y + leftVec.dy);
-          const rightClear = this.canEnter(n.x + rightVec.dx, n.y + rightVec.dy);
-
-          if (leftClear && rightClear) {
-            // 50/50 probability between LEFT and RIGHT
-            const pickLeft = Math.random() < 0.5;
-            n.dir = pickLeft ? leftDir : rightDir;
-            this.floatText(n.x, n.y, pickLeft ? '↰ 50% LEFT' : '↱ 50% RIGHT', '#38bdf8');
-          } else if (leftClear) {
-            n.dir = leftDir;
-            this.floatText(n.x, n.y, '↰ LEFT (CLEAR)', '#38bdf8');
-          } else if (rightClear) {
-            n.dir = rightDir;
-            this.floatText(n.x, n.y, '↱ RIGHT (CLEAR)', '#38bdf8');
-          } else {
-            // Both sides blocked: 180° turnaround
-            n.dir = DIRS[(DIRS.indexOf(n.dir) + 2) % 4];
-            this.floatText(n.x, n.y, '↩ U-TURN', '#94a3b8');
-          }
-        } else {
-          // Standard deterministic turn when not facing wall
-          if (n.action === 'TURN_LEFT') {
-            n.dir = DIRS[(DIRS.indexOf(n.dir) + 3) % 4];
-          } else {
-            n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4];
-          }
-        }
+        n.dir = DIRS[(DIRS.indexOf(n.dir) + 3) % 4];
         break;
-      }
+
+      case 'TURN_RIGHT':
+        n.dir = DIRS[(DIRS.indexOf(n.dir) + 1) % 4];
+        break;
 
       case 'JUMP': {
         const pit = this.ahead(1);

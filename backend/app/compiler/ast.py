@@ -53,16 +53,25 @@ class RuleNode(ASTNode):
         action: ActionNode,
         line: int = 0,
         column: int = 0,
+        alternatives: Optional[List[str]] = None,
+        is_stochastic: bool = False,
+        probability: float = 1.0,
     ):
         super().__init__(line, column)
         self.condition = condition
         self.action = action
+        self.alternatives = alternatives or [action.name]
+        self.is_stochastic = is_stochastic or (len(self.alternatives) > 1)
+        self.probability = probability
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "Rule",
             "condition": self.condition.to_dict(),
             "action": self.action.to_dict(),
+            "isStochastic": self.is_stochastic,
+            "alternatives": self.alternatives,
+            "probability": self.probability,
             "line": self.line,
             "column": self.column,
         }

@@ -93,6 +93,23 @@ class Lexer:
             elif ch == ":":
                 self._advance()
                 self.tokens.append(Token(TokenType.COLON, ":", start_line, start_col))
+            elif ch == "|":
+                self._advance()
+                self.tokens.append(Token(TokenType.PIPE, "|", start_line, start_col))
+            elif ch == "(":
+                self._advance()
+                self.tokens.append(Token(TokenType.LPAREN, "(", start_line, start_col))
+            elif ch == ")":
+                self._advance()
+                self.tokens.append(Token(TokenType.RPAREN, ")", start_line, start_col))
+            elif ch == "%":
+                self._advance()
+                self.tokens.append(Token(TokenType.PERCENT, "%", start_line, start_col))
+            elif ch.isdigit():
+                num_str = ""
+                while self.pos < self.length and (self._peek().isdigit() or self._peek() == "."):
+                    num_str += self._advance()
+                self.tokens.append(Token(TokenType.NUMBER, num_str, start_line, start_col))
             elif ch.isalpha() or ch == "_":
                 # Identifier or keyword or condition or action
                 ident = ""

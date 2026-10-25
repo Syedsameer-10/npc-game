@@ -1,18 +1,31 @@
 """Intermediate Representation (IR) generation for NPC Behavior Language."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from .ast import ProgramNode, RuleNode
 
 
 class IRInstruction:
-    def __init__(self, condition: str, action: str, priority: int, line: int):
+    def __init__(
+        self,
+        condition: str,
+        action: str,
+        priority: int,
+        line: int,
+        alternatives: Optional[List[str]] = None,
+        is_stochastic: bool = False,
+        probability: float = 1.0,
+    ):
         self.condition = condition
         self.action = action
         self.priority = priority
         self.line = line
+        self.alternatives = alternatives or [action]
+        self.is_stochastic = is_stochastic or (len(self.alternatives) > 1)
+        self.probability = probability
 
     def to_code(self) -> str:
-        return f"IF {self.condition} THEN {self.action}"
+        prob_str = f" [{int(self.probability*100)}%]" if self.probability < 1.0 else ""
+        return f"IF {self.condition}{prob_str} THEN {self.action}"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -21,6 +34,9 @@ class IRInstruction:
             "action": self.action,
             "priority": self.priority,
             "line": self.line,
+            "isStochastic": self.is_stochastic,
+            "alternatives": self.alternatives,
+            "probability": self.probability,
             "instruction": self.to_code(),
         }
 
@@ -57,6 +73,9 @@ class IRGenerator:
                 action=rule.action.name,
                 priority=idx + 1,
                 line=rule.line,
+                alternatives=getattr(rule, "alternatives", [rule.action.name]),
+                is_stochastic=getattr(rule, "is_stochastic", False),
+                probability=getattr(rule, "probability", 1.0),
             )
             instructions.append(inst)
 

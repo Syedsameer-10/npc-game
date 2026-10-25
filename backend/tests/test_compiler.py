@@ -61,3 +61,21 @@ def test_compiler_semantic_error_halt():
     assert res.success is False
     assert len(res.errors) == 1
     assert res.errors[0]["phase"] == "Semantic Analysis"
+
+
+def test_compiler_stochastic_50_50_rules():
+    source = """
+    NPC Scout {
+        WHEN WALL_AHEAD: TURN_LEFT | TURN_RIGHT
+        WHEN PATH_CLEAR: MOVE_FORWARD
+    }
+    """
+    compiler = NPCCompiler()
+    res = compiler.compile(source)
+
+    assert res.success is True
+    assert res.errors == []
+    rule0 = res.behavior["rules"][0]
+    assert rule0["condition"] == "WALL_AHEAD"
+    assert rule0["isStochastic"] is True
+    assert rule0["alternatives"] == ["TURN_LEFT", "TURN_RIGHT"]

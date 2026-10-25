@@ -26,7 +26,8 @@ export const COMPAT = {
 export const BNF_GRAMMAR = [
   { nonTerminal: "Program", production: "NPC <Identifier> '{' <RuleList> '}' <EOF>", desc: "Root compilation unit declaring NPC container" },
   { nonTerminal: "RuleList", production: "<Rule> <RuleList> | ε", desc: "Sequence of behavioral event-action rules" },
-  { nonTerminal: "Rule", production: "WHEN <Condition> ':' <Action>", desc: "Reactive sensory condition-to-actuator rule mapping" },
+  { nonTerminal: "Rule", production: "WHEN <Condition> [ '(' <Probability> ')' ] ':' <ActionExpr>", desc: "Reactive sensory condition-to-actuator rule mapping with optional probability" },
+  { nonTerminal: "ActionExpr", production: "<Action> [ '|' <Action> ]*", desc: "Deterministic action or stochastic multi-branch union (e.g. TURN_LEFT | TURN_RIGHT)" },
   { nonTerminal: "Condition", production: "WALL_AHEAD | PIT_AHEAD | PATH_CLEAR | ENEMY_NEAR | PLAYER_SEEN | PLAYER_NEAR | TREASURE_NEAR | HEALTH_LOW | DOOR_AHEAD", desc: "Sensory suite boolean query" },
   { nonTerminal: "Action", production: "MOVE_FORWARD | TURN_LEFT | TURN_RIGHT | JUMP | ATTACK | CHASE | RUN_AWAY | COLLECT | STOP", desc: "Actuator motor command dispatch" },
 ];
@@ -46,17 +47,33 @@ export function tokenize(src) {
       continue;
     }
     const sl = line, sc = col;
-    if ('{}:'.includes(ch)) {
+    if ('{}:|()%'.includes(ch)) {
       tokens.push({
         id: `tok_${tokens.length + 1}`,
-        type: ch === '{' ? 'LBRACE' : ch === '}' ? 'RBRACE' : 'COLON',
-        category: 'delimiter',
+        type: ch === '{' ? 'LBRACE' : ch === '}' ? 'RBRACE' : ch === ':' ? 'COLON' : ch === '|' ? 'PIPE' : ch === '(' ? 'LPAREN' : ch === ')' ? 'RPAREN' : 'PERCENT',
+        category: ch === '|' ? 'operator' : 'delimiter',
         value: ch,
         line: sl,
         column: sc,
         length: 1,
       });
       pos++; col++; continue;
+    }
+    if (/[0-9]/.test(ch)) {
+      let num = '';
+      while (pos < len && /[0-9.]/.test(src[pos])) {
+        num += src[pos]; pos++; col++;
+      }
+      tokens.push({
+        id: `tok_${tokens.length + 1}`,
+        type: 'NUMBER',
+        category: 'literal',
+        value: num,
+        line: sl,
+        column: sc,
+        length: num.length,
+      });
+      continue;
     }
     if (/[a-zA-Z_]/.test(ch)) {
       let id = '';
@@ -214,6 +231,22 @@ export function parse(tokens) {
       e.line = ct.line; e.column = ct.column; throw e;
     }
     pos++;
+
+    let probability = 1.0;
+    if (cur().type === 'LPAREN') {
+      pos++; // consume '('
+      const numTok = cur();
+      if (numTok.type === 'NUMBER') {
+        probability = parseFloat(numTok.value);
+        pos++;
+        if (cur().type === 'PERCENT') {
+          probability /= 100.0;
+          pos++;
+        }
+      }
+      if (cur().type === 'RPAREN') pos++;
+    }
+
     const colonTok = cur();
     if (colonTok.type !== 'COLON') {
       const e = new Error(`Expected ':' after condition '${ct.value}'`);
@@ -226,6 +259,21 @@ export function parse(tokens) {
       e.line = at.line; e.column = at.column; throw e;
     }
     pos++;
+
+    const actionAlternatives = [at.value];
+    while (cur().type === 'PIPE') {
+      pos++; // consume '|'
+      const nextAct = cur();
+      if (nextAct.type !== 'ACTION') {
+        const e = new Error(`Expected action after '|', got '${nextAct.value}'`);
+        e.line = nextAct.line; e.column = nextAct.column; throw e;
+      }
+      pos++;
+      actionAlternatives.push(nextAct.value);
+    }
+
+    const isStochastic = actionAlternatives.length > 1 || probability < 1.0;
+    const combinedAction = actionAlternatives.length > 1 ? actionAlternatives.join(' | ') : at.value;
 
     const ruleCst = {
       type: 'NonTerminal',
@@ -245,7 +293,7 @@ export function parse(tokens) {
           type: 'NonTerminal',
           name: 'Action',
           line: at.line,
-          children: [{ type: 'Terminal', value: at.value, tokenType: 'ACTION', line: at.line, column: at.column }]
+          children: actionAlternatives.map(alt => ({ type: 'Terminal', value: alt, tokenType: 'ACTION', line: at.line, column: at.column }))
         },
       ]
     };
@@ -254,8 +302,19 @@ export function parse(tokens) {
     rules.push({
       type: 'Rule',
       id: `ast_rule_${rules.length + 1}`,
-      condition: { type: 'Condition', name: ct.value, line: ct.line, column: ct.column },
-      action: { type: 'Action', name: at.value, line: at.line, column: at.column },
+      condition: { type: 'Condition', name: ct.value, line: ct.line, column: ct.column, probability },
+      action: {
+        type: 'Action',
+        name: combinedAction,
+        isStochastic,
+        alternatives: actionAlternatives,
+        probability,
+        line: at.line,
+        column: at.column,
+      },
+      isStochastic,
+      alternatives: actionAlternatives,
+      probability,
       line: wTok.line,
       column: wTok.column,
     });
@@ -321,15 +380,16 @@ export function semantic(ast) {
     const r = ast.npc.rules[idx];
     const c = r.condition.name;
     const a = r.action.name;
-    const isShadowed = seen.has(c);
+    const isProbabilistic = (r.probability && r.probability < 1.0) || r.isStochastic;
+    const isShadowed = seen.has(c) && !isProbabilistic;
 
     symbolTable.push({
       identifier: `rule_${idx + 1}`,
-      type: 'DISPATCH_RULE',
+      type: r.isStochastic ? 'STOCHASTIC_RULE' : 'DISPATCH_RULE',
       scope: ast.npc.name,
       value: `WHEN ${c} : ${a}`,
       declaration: `Line ${r.line}`,
-      usage: isShadowed ? 'Shadowed (Dead Code)' : 'Active Dispatch',
+      usage: isShadowed ? 'Shadowed (Dead Code)' : r.isStochastic ? 'Stochastic Branch' : 'Active Dispatch',
       line: r.line,
       column: r.column,
       status: isShadowed ? 'SHADOWED' : 'VALIDATED',
@@ -349,15 +409,20 @@ export function semantic(ast) {
     }
 
     const allowed = COMPAT[c];
-    if (allowed && !allowed.has(a)) {
-      errors.push({
-        phase: 'Semantic Analysis',
-        severity: 'error',
-        message: `Actuator command '${a}' is incompatible with sensor condition '${c}'.`,
-        line: r.action.line,
-        column: r.action.column,
-        suggestion: `Valid actions for '${c}': ${[...allowed].sort().join(', ')}`
-      });
+    const actionsToCheck = r.action.alternatives || [a];
+    if (allowed) {
+      for (const singleAct of actionsToCheck) {
+        if (!allowed.has(singleAct)) {
+          errors.push({
+            phase: 'Semantic Analysis',
+            severity: 'error',
+            message: `Actuator command '${singleAct}' is incompatible with sensor condition '${c}'.`,
+            line: r.action.line,
+            column: r.action.column,
+            suggestion: `Valid actions for '${c}': ${[...allowed].sort().join(', ')}`
+          });
+        }
+      }
     } else if (!allowed) {
       errors.push({
         phase: 'Semantic Analysis',
@@ -461,25 +526,35 @@ export function generateIR(ast) {
   let p = 1;
 
   for (const r of ast.npc.rules) {
+    const isStoch = r.isStochastic || (r.action.alternatives && r.action.alternatives.length > 1);
     const condTemp = `t${p * 2 - 1}`;
     const actTemp = `t${p * 2}`;
+    const branchText = isStoch
+      ? `IF ${condTemp} != 0 GOTO PROB_BRANCH_${p}`
+      : `IF ${condTemp} != 0 GOTO ACT_${p}`;
+    const actText = isStoch
+      ? `PROB_BRANCH_${p}: ${actTemp}_r = RAND(); IF ${actTemp}_r < 0.5 GOTO ACT_${p}_A ELSE GOTO ACT_${p}_B\n    ACT_${p}_A: ${actTemp} = EXEC(ACT_${r.action.alternatives[0]}); GOTO EXIT\n    ACT_${p}_B: ${actTemp} = EXEC(ACT_${r.action.alternatives[1]}); GOTO EXIT`
+      : `ACT_${p}: ${actTemp} = EXEC(ACT_${r.action.name}); GOTO EXIT`;
 
     instructions.push({
       index: p,
       label: `L${p}`,
-      op: 'SENSE',
+      op: isStoch ? 'PROB_BRANCH' : 'SENSE',
       dest: condTemp,
       arg1: `SENSOR_${r.condition.name}`,
       arg2: null,
       raw3AC: `${condTemp} = SENSE(SENSOR_${r.condition.name})`,
       condition: r.condition.name,
       action: r.action.name,
-      target: `ACT_${p}`,
+      isStochastic: isStoch,
+      alternatives: r.action.alternatives || [r.action.name],
+      probability: r.probability || 1.0,
+      target: isStoch ? `PROB_BRANCH_${p}` : `ACT_${p}`,
       priority: p,
       line: r.line,
-      type: 'conditional_branch',
-      branchText: `IF ${condTemp} != 0 GOTO ACT_${p}`,
-      actText: `ACT_${p}: ${actTemp} = EXEC(ACT_${r.action.name}); GOTO EXIT`,
+      type: isStoch ? 'stochastic_branch' : 'conditional_branch',
+      branchText,
+      actText,
     });
     p++;
   }
@@ -512,7 +587,7 @@ export function optimize(ir, semanticInfo) {
   let prunedCount = 0;
 
   for (const inst of ir.instructions) {
-    if (seenConditions.has(inst.condition)) {
+    if (seenConditions.has(inst.condition) && !inst.isStochastic && inst.probability >= 1.0) {
       prunedCount++;
       passesApplied.push({
         id: 'pass_dce',
@@ -609,6 +684,9 @@ export function generateBehavior(optResult, npcName) {
       id: `rule_${i.optimizedPriority}`,
       condition: i.condition,
       action: i.action,
+      isStochastic: i.isStochastic || false,
+      alternatives: i.alternatives || null,
+      probability: i.probability || 1.0,
       priority: i.optimizedPriority,
       isActive: true,
       sourceLine: i.line,
@@ -646,8 +724,8 @@ export function generateBehavior(optResult, npcName) {
     });
     assemblyInstructions.push({
       opcode: `+6`,
-      asm: `CALL ACTUATOR_${i.action}`,
-      comment: `; Execute action actuator directly`,
+      asm: i.isStochastic ? `CALL PROB_DISPATCH (${i.alternatives.join(', ')})` : `CALL ACTUATOR_${i.action}`,
+      comment: i.isStochastic ? `; Stochastic branch dispatch` : `; Execute action actuator directly`,
       line: i.line,
       type: 'call',
     });
@@ -793,9 +871,9 @@ export const MASTER_PROGRAM = `NPC MasterBot {
     WHEN PIT_AHEAD:
         JUMP
 
-    // 03. Navigation: 50/50 turn left or right at walls
+    // 03. Navigation: Compiler-level 50/50 stochastic turn at walls
     WHEN WALL_AHEAD:
-        TURN_RIGHT
+        TURN_LEFT | TURN_RIGHT
 
     // 04. Tactical Combat: Eliminate hostile sentries
     WHEN ENEMY_NEAR:
