@@ -1,90 +1,201 @@
 ================================================================================
-NPC BEHAVIOR COMPILER & 2D TACTICAL SIMULATION WORKBENCH
-Project Overview & Architecture Summary
+NPC BEHAVIOR COMPILER & AUTONOMOUS AGENT SIMULATION WORKBENCH
+Comprehensive Project Technical Brief & System Architecture
 ================================================================================
 
-1. WHAT IS THIS PROJECT?
+1. EXECUTIVE SUMMARY & PURPOSE
 --------------------------------------------------------------------------------
-This project is an end-to-end Compiler Pipeline & 2D Autonomous Simulation
-Workbench. It allows developers to author robot/NPC behaviors in a custom
-reactive Domain-Specific Language (DSL), compiles the code through a 9-stage
-production compiler pipeline, and executes the emitted bytecode in a real-time
-tactical 2D grid world.
+Most game developers and AI engineers hardcode non-player character (NPC) logic
+using tangled, error-prone `if/else` blocks or monolithic state machines that
+are difficult to verify, optimize, or inspect.
 
-2. THE REACTIVE DSL
+This project solves that problem by treating NPC behaviors as a compiled software
+engineering discipline. It provides:
+  1. A formal, declarative Domain-Specific Language (DSL) for reactive behaviors.
+  2. A complete 9-stage compiler pipeline that transforms high-level behavioral
+     specifications into verified, optimized virtual machine bytecode.
+  3. An interactive developer workbench with deep compiler artifact inspection
+     (Lexer tables, Automata graphs, CST/AST trees, CFGs, IR diffs, Bytecode).
+  4. A real-time 2D tactical simulation sandbox where the compiled bytecode
+     directly drives an autonomous agent alongside a human operator.
+
+
+2. THE DOMAIN-SPECIFIC LANGUAGE (DSL)
 --------------------------------------------------------------------------------
-The language maps environmental perception (Sensors) to physical actuators (Actions):
+The DSL is designed around reactive sensor-actuator mappings:
 
     NPC MasterBot {
-        WHEN HEALTH_LOW:    STOP          // Emergency self-repair
-        WHEN PIT_AHEAD:     JUMP          // Hydraulic gap leap
-        WHEN WALL_AHEAD:    TURN_RIGHT    // Obstacle avoidance
-        WHEN ENEMY_NEAR:    ATTACK        // Sentry plasma strike
-        WHEN TREASURE_NEAR: COLLECT       // Data core siphon
+        WHEN HEALTH_LOW:    STOP          // Field self-repair
+        WHEN PIT_AHEAD:     JUMP          // Obstacle leap
+        WHEN WALL_AHEAD:    TURN_RIGHT    // Boundary evasion
+        WHEN ENEMY_NEAR:    ATTACK        // Sentry elimination
+        WHEN TREASURE_NEAR: COLLECT       // Data core harvesting
         WHEN PLAYER_SEEN:   CHASE         // Optical line-of-sight tracking
         WHEN PLAYER_NEAR:   RUN_AWAY      // Tactical spacing from operator
         WHEN DOOR_AHEAD:    STOP          // Extraction gate hold
         WHEN PATH_CLEAR:    MOVE_FORWARD  // Default corridor cruising
     }
 
-3. THE 9-STAGE COMPILER PIPELINE
+Formal LL(1) Grammar (BNF):
+  <Program>    ::= NPC <Identifier> "{" <RuleList> "}" <EOF>
+  <RuleList>   ::= <Rule> <RuleList> | ε
+  <Rule>       ::= WHEN <Condition> ":" <Action>
+  <Condition>  ::= WALL_AHEAD | PIT_AHEAD | PATH_CLEAR | ENEMY_NEAR |
+                   PLAYER_SEEN | PLAYER_NEAR | TREASURE_NEAR |
+                   HEALTH_LOW | DOOR_AHEAD
+  <Action>     ::= MOVE_FORWARD | TURN_LEFT | TURN_RIGHT | JUMP |
+                   ATTACK | CHASE | RUN_AWAY | COLLECT | STOP
+
+
+3. THE 9-STAGE COMPILER PIPELINE (PHASE-BY-PHASE)
 --------------------------------------------------------------------------------
-01. LEXER:
-    Scans raw source text into categorized tokens (keywords, sensors, actions,
-    delimiters) with line & column metrics.
+The compiler takes raw source code and moves it through classical and modern
+compiler phases:
 
-02. AUTOMATA:
-    Constructs formal Thompson NFA and subset-construction DFA state machines
-    recognizing language tokens and transitions.
+[01] LEXICAL ANALYSIS (Lexer):
+     - Scans the character stream into typed lexical tokens:
+       Keywords (`NPC`, `WHEN`), Identifiers, Conditions, Actions, Delimiters.
+     - Tracks line numbers, column offsets, and lexical errors.
+     - Produces a token table and lexical density statistics.
 
-03. PARSER (CST):
-    Builds a Concrete Syntax Tree using LL(1) grammar productions with syntax
-    validation and parse error recovery.
+[02] FINITE AUTOMATA (Automata):
+     - Demonstrates formal language theory behind lexical recognition.
+     - Constructs Thompson's Non-Deterministic Finite Automata (NFA) with
+       epsilon transitions for keyword and token patterns.
+     - Applies subset construction to derive deterministic DFA state graphs
+       with start and accepting states.
 
-04. AST:
-    Strips grammatical boilerplate into a hierarchical Abstract Syntax Tree
-    representing meaningful program structure.
+[03] SYNTACTIC ANALYSIS (Parser & CST):
+     - Recursive-descent LL(1) parser enforcing the formal grammar.
+     - Produces a Concrete Syntax Tree (Parse Tree) retaining syntactic
+       tokens, delimiters, and production rules.
+     - Performs syntax error detection with line and column diagnostic markers.
 
-05. SEMANTIC ANALYSIS:
-    Constructs a scoped Symbol Table and enforces strict sensor-actuator
-    compatibility checks (e.g. catches errors like "WHEN WALL_AHEAD: JUMP").
+[04] ABSTRACT SYNTAX TREE (AST):
+     - Strips syntactic boilerplate (braces, colons, keyword tokens) to form
+     - a clean semantic tree: ProgramNode -> NPCNode -> RuleNode(Condition, Action).
+     - Provides the foundational intermediate tree for semantic validation.
 
-06. CONTROL FLOW GRAPH (CFG):
-    Partitions program flow into Basic Blocks with directed branch edges,
-    condition evaluations, and fallbacks.
+[05] SEMANTIC ANALYSIS & TYPE SYSTEM:
+     - Constructs a scoped Symbol Table for entity identification and rule index.
+     - Enforces sensor-actuator compatibility invariants:
+       • Prohibits invalid actions (e.g. `WHEN WALL_AHEAD: JUMP` -> ERROR).
+       • Enforces valid motor domains:
+         - WALL_AHEAD    -> { TURN_LEFT, TURN_RIGHT, STOP }
+         - PIT_AHEAD     -> { JUMP, TURN_LEFT, TURN_RIGHT, STOP }
+         - PATH_CLEAR    -> { MOVE_FORWARD, STOP }
+         - ENEMY_NEAR    -> { ATTACK, RUN_AWAY, CHASE }
+         - PLAYER_SEEN   -> { CHASE, RUN_AWAY, ATTACK }
+         - PLAYER_NEAR   -> { ATTACK, RUN_AWAY }
+         - TREASURE_NEAR -> { COLLECT }
+         - HEALTH_LOW    -> { RUN_AWAY, STOP }
+         - DOOR_AHEAD    -> { STOP, TURN_LEFT, TURN_RIGHT }
+     - Detects unreachable rules and duplicate sensory handlers.
 
-07. INTERMEDIATE REPRESENTATION (IR):
-    Emits linear Three-Address Code (3AC) quadruples for platform-independent
-    representation.
+[06] CONTROL FLOW GRAPH (CFG):
+     - Analyzes program flow and partitions execution into Basic Blocks:
+       Entry -> Sensor Checks -> Actuator Dispatches -> Next / Fallback -> Exit.
+     - Connects blocks with directed conditional edges (True / False branches).
 
-08. OPTIMIZER:
-    Applies dominance pruning, dead code elimination, and table packing with
-    a side-by-side Before/After diff and reduction metrics.
+[07] INTERMEDIATE REPRESENTATION (IR):
+     - Linearizes AST and CFG into Three-Address Code (3AC) quadruples.
+     - Generates symbolic temporary variables (`t1`, `t2`) and labeled jumps
+       (`IF t1 GOTO L_ACT`, `GOTO L_NEXT`) decoupling behavior from target hardware.
 
-09. CODE GENERATION:
-    Generates target VM bytecode, jump addresses, and assembly-style actuator
-    dispatch tables.
+[08] OPTIMIZATION ENGINE:
+     - Evaluates the IR code through multiple optimization passes:
+       • Dominance pruning: identifies redundant condition queries.
+       • Dead code elimination: removes shadowed or unreachable branch instructions.
+       • Rule table packing: squashes redundant jump sequences.
+     - Renders a side-by-side Before / After diff with instruction reduction metrics.
 
-4. REAL-TIME 2D TACTICAL SIMULATOR
+[09] TARGET CODE GENERATION (CodeGen):
+     - Compiles optimized IR into executable virtual machine bytecode and
+       an assembly-style instruction dispatch table.
+     - Maps each rule to an opcode, target sensor mask, and actuator routine pointer.
+
+
+4. THE 2D TACTICAL SIMULATION ENGINE
 --------------------------------------------------------------------------------
-- NPC Agent (▲): Autonomous actor driven 100% by compiled bytecode rules.
-- Operator (◉): Player-controlled companion (WASD navigation + Space melee).
-- World Elements:
-    • Solid Walls (#): Blocks line-of-sight and movement.
-    • Hazard Pits (O): Gaps requiring JUMP actuator.
-    • Target Sentries (◆): Static defense dummies destructible by NPC/Player.
-    • Data Cores (◈): Energy treasures to collect (+150 pts).
-    • Exit Gate (⌑): Vault portal unlocking when all cores are gathered.
-- Live Telemetry:
-    • 9-Sensor radar array with live activity LEDs.
-    • Real-time rule firing indicator (#Priority: Condition -> Action).
-    • Health, cycle count, score, and heading monitors.
+The game engine is not a mockup; it is a true execution environment for the
+compiled bytecode:
 
-5. TECHNOLOGY STACK
+• Execution Cycle:
+  At each clock tick (50ms - 800ms adjustable):
+    1. Sense: Evaluates the 9 environmental sensors for the NPC.
+    2. Decide: Queries the compiled bytecode dispatch table in priority order.
+    3. Act: Dispatches the corresponding physical actuator command.
+
+• Simulation World Elements:
+  - NPC Agent (▲): 100% autonomous; actions driven strictly by compiled rules.
+  - Operator (◉): Companion controlled by human player (WASD move, Space melee).
+  - Solid Walls (#): Blocks movement and line-of-sight raycasting.
+  - Hazard Pits (O): Impassable holes that must be crossed using `JUMP`.
+  - Static Sentries (◆): Defensive target dummies destructible by NPC or player.
+  - Data Cores (◈): Collectible energy loot items (+150 pts).
+  - Exit Gate (⌑): Extraction portal unlocking upon full core harvest.
+
+• Live Telemetry Array:
+  - 9-sensor LED status radar updating live on every game tick.
+  - Active rule broadcast displaying current firing rule (`#Priority: Cond -> Act`).
+  - Shield integrity percentage, coordinate heading, and score counters.
+
+
+5. DEVELOPER WORKBENCH & USER EXPERIENCE
 --------------------------------------------------------------------------------
-• Frontend: React 19, Vite, Tailwind CSS, Canvas API, Geist Typography
-• Backend: Python 3.11, FastAPI, Uvicorn, Pydantic, Pytest
-• Deployment: Docker multi-stage build, Render.com blueprint ready (render.yaml)
-• Architecture: Dual-mode execution (Client-side instant compilation + FastAPI
-  production REST API with /api/compile and /api/health).
+• Dual-View Platform:
+  1. Main Workbench: Monospace code editor, 9-phase stepper, and 2D simulator.
+  2. Full-Screen Phase Inspector (`/#/phases`): Dedicated deep-dive view for
+     examining compiler data structures (SVG state graphs, expandable AST trees,
+     basic block diagrams, side-by-side IR diff).
+
+• Dual Compiler Engine Architecture:
+  - Python Backend: Production FastAPI server exposing `/api/compile`, `/api/presets`,
+    and `/api/health`, tested with automated pytest test suites.
+  - Client-Side Engine: Mirror JavaScript compiler running in-browser for zero-latency
+    instant preview and offline support even while backend servers wake up.
+
+• CLI Terminal Loading Screen:
+  Render/Vercel-style developer terminal overlay displaying compilation phases,
+  microsecond execution times, and subsystem startup logs.
+
+
+6. SOFTWARE ARCHITECTURE & DIRECTORY STRUCTURE
+--------------------------------------------------------------------------------
+  ├── backend/                      # Python FastAPI Compiler Backend
+  │   ├── app/
+  │   │   ├── compiler/             # Compiler modules: lexer, parser, ast,
+  │   │   │                         # semantic, ir, codegen, compiler pipeline
+  │   │   ├── main.py               # REST API endpoints, SPA static file serving
+  │   │   └── schemas.py            # Pydantic data models & diagnostics
+  │   └── tests/                    # Automated pytest test suites (13 unit tests)
+  │
+  ├── frontend/                     # React 19 + Vite Interactive Workbench
+  │   ├── src/
+  │   │   ├── compiler/             # In-browser compiler engine & API client
+  │   │   ├── components/           # HeroEditor, PipelineStepper, PhaseSections,
+  │   │   │                         # GameSection, CompileOverlay, TopNav
+  │   │   ├── game/                 # GameEngine.js 2D grid world simulator
+  │   │   └── pages/                # PhasesPage full-screen compiler inspector
+  │   └── vite.config.js            # Vite build configuration with backend proxy
+  │
+  ├── examples/                     # Canonical DSL behavior scripts (master.npc)
+  ├── Dockerfile                    # Multi-stage production container build
+  ├── render.yaml                   # Render Blueprint Infrastructure-as-Code
+  ├── build.sh                      # Universal shell build script
+  ├── run.py                        # Unified server entrypoint (reads $PORT/$HOST)
+  └── requirements.txt              # FastAPI, Uvicorn, Pydantic, Pytest, aiofiles
+
+
+7. PRODUCTION DEPLOYMENT
+--------------------------------------------------------------------------------
+• Multi-Stage Docker Build:
+  - Stage 1 (Node 20): Compiles the React/Vite frontend into `frontend/dist`.
+  - Stage 2 (Python 3.11): Installs Python requirements, copies built frontend,
+    and serves both the API and the SPA from Uvicorn on `$PORT`.
+• Single-Domain Architecture:
+  Eliminates CORS errors and optimizes Render's free tier by serving the entire
+  frontend and backend under one unified URL (e.g. `https://npc-game.onrender.com`).
+• Cloud Ready:
+  Native health check probing (`/api/health`) and Render Blueprint auto-provisioning.
 ================================================================================
