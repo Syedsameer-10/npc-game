@@ -88,5 +88,5 @@ def test_all_81_condition_action_combinations():
                 assert res.success is False, f"Expected error for ({cond}, {act})"
                 assert any(e["phase"] == "Semantic Analysis" for e in res.errors)
 
-    assert valid_count == 23
-    assert invalid_count == 58
+    assert valid_count == 26
+    assert invalid_count == 55

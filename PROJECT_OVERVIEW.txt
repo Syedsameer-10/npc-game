@@ -85,9 +85,9 @@ compiler phases:
          - WALL_AHEAD    -> { TURN_LEFT, TURN_RIGHT, STOP }
          - PIT_AHEAD     -> { JUMP, TURN_LEFT, TURN_RIGHT, STOP }
          - PATH_CLEAR    -> { MOVE_FORWARD, STOP }
-         - ENEMY_NEAR    -> { ATTACK, RUN_AWAY, CHASE }
-         - PLAYER_SEEN   -> { CHASE, RUN_AWAY, ATTACK }
-         - PLAYER_NEAR   -> { ATTACK, RUN_AWAY }
+         - ENEMY_NEAR    -> { ATTACK, RUN_AWAY, CHASE, STOP }
+         - PLAYER_SEEN   -> { CHASE, RUN_AWAY, ATTACK, STOP }
+         - PLAYER_NEAR   -> { ATTACK, RUN_AWAY, STOP }
          - TREASURE_NEAR -> { COLLECT }
          - HEALTH_LOW    -> { RUN_AWAY, STOP }
          - DOOR_AHEAD    -> { STOP, TURN_LEFT, TURN_RIGHT }
